@@ -148,7 +148,7 @@ fun HomeScreen(
                     // the row simply scrolls, so the header stays symmetric.
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(
                             8.dp,
                             Alignment.CenterHorizontally,
@@ -158,6 +158,7 @@ fun HomeScreen(
                             PillChip(
                                 selected = channel.pageId == state.channelId,
                                 label = channel.title,
+                                compact = true,
                                 onClick = { onSelectChannel(channel.pageId) },
                             )
                         }
@@ -168,7 +169,7 @@ fun HomeScreen(
                                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                             ) {
                                 Box(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
@@ -596,11 +597,11 @@ private fun ChannelEditorSheet(
 
 @Composable
 private fun SectionBlock(section: HomeSection, onOpenAlbum: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -647,11 +648,12 @@ private fun SectionBlock(section: HomeSection, onOpenAlbum: (String) -> Unit) {
                                 album = album,
                                 stats = section.stats[album.id],
                                 rank = if (section.isRanking) index + 1 else null,
-                                modifier = Modifier.weight(1f).padding(4.dp),
+                                compact = true,
+                                modifier = Modifier.weight(1f).padding(3.dp),
                                 onClick = { onOpenAlbum(album.id) },
                             )
                         }
-                        repeat(columns - row.size) { Box(Modifier.weight(1f).padding(4.dp)) }
+                        repeat(columns - row.size) { Box(Modifier.weight(1f).padding(3.dp)) }
                     }
                 }
             }
@@ -664,10 +666,16 @@ private fun AlbumCard(
     album: Album,
     stats: HomeAlbumStats?,
     rank: Int?,
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val coverSize = if (rank == null) 84 else 68
+    val coverSize = when {
+        compact && rank == null -> 68
+        compact -> 56
+        rank == null -> 84
+        else -> 68
+    }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -675,7 +683,7 @@ private fun AlbumCard(
         onClick = onClick,
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(if (compact) 9.dp else 12.dp),
             verticalAlignment = Alignment.Top,
         ) {
             Box {
@@ -726,11 +734,11 @@ private fun AlbumCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 12.dp),
+                    .padding(start = if (compact) 10.dp else 12.dp),
             ) {
                 Text(
                     album.title,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -742,7 +750,7 @@ private fun AlbumCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 3.dp),
+                        modifier = Modifier.padding(top = if (compact) 2.dp else 3.dp),
                     )
                 }
                 if (rank == null && album.intro.isNotEmpty()) {
@@ -750,13 +758,13 @@ private fun AlbumCard(
                         album.intro,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        maxLines = 2,
+                        maxLines = if (compact) 1 else 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = if (compact) 2.dp else 4.dp),
                     )
                 }
                 Row(
-                    modifier = Modifier.padding(top = 6.dp),
+                    modifier = Modifier.padding(top = if (compact) 4.dp else 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
@@ -770,7 +778,7 @@ private fun AlbumCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = if (compact) 1.dp else 2.dp),
                             )
                         }
                     }
@@ -783,7 +791,7 @@ private fun AlbumCard(
                                 "完结",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = if (compact) 1.dp else 2.dp),
                             )
                         }
                     }
@@ -828,17 +836,17 @@ fun TrackRow(track: Track, onPlay: () -> Unit) {
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 3.dp),
     ) {
         Row(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Cover(track.coverUrl, 48)
+            Cover(track.coverUrl, 44)
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 10.dp),
             ) {
                 Text(
                     track.title.ifEmpty { track.number },
@@ -856,7 +864,7 @@ fun TrackRow(track: Track, onPlay: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 3.dp),
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
             FilledTonalIconButton(

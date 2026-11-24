@@ -118,7 +118,7 @@ fun ListeningScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+                    .padding(start = 16.dp, end = 12.dp, top = 6.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -146,7 +146,7 @@ fun ListeningScreen(
                 }
             }
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(tabs.size) { index ->
@@ -379,9 +379,9 @@ private fun UpdatesTab(
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 3.dp),
                 ) {
-                    Column(Modifier.padding(vertical = 10.dp)) {
+                    Column(Modifier.padding(vertical = 6.dp)) {
                         Text(
                             "常听订阅",
                             style = MaterialTheme.typography.labelLarge,
@@ -390,20 +390,20 @@ private fun UpdatesTab(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
                         )
                         LazyRow(
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             items(state.subscriptions.take(20), key = { it.album.id }) { item ->
                                 Column(
                                     Modifier
-                                        .width(72.dp)
+                                        .width(64.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .clickable { onOpenAlbum(item.album.id) }
                                         .padding(vertical = 2.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
                                     Box {
-                                        Cover(item.album.coverUrl, 64)
+                                        Cover(item.album.coverUrl, 56)
                                         if (item.unreadCount > 0) {
                                             Badge(
                                                 modifier = Modifier
@@ -420,7 +420,7 @@ private fun UpdatesTab(
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                         textAlign = TextAlign.Center,
-                                        modifier = Modifier.padding(top = 6.dp),
+                                        modifier = Modifier.padding(top = 4.dp),
                                     )
                                 }
                             }
@@ -658,17 +658,17 @@ private fun BookmarksTab(
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = 16.dp, vertical = 3.dp),
             ) {
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Cover(bookmark.track.coverUrl, 52)
+                    Cover(bookmark.track.coverUrl, 46)
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = 12.dp),
+                            .padding(horizontal = 10.dp),
                     ) {
                         Text(
                             bookmark.track.title.ifEmpty { bookmark.track.number },
@@ -680,7 +680,7 @@ private fun BookmarksTab(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = 2.dp),
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
@@ -776,7 +776,7 @@ private fun <T> androidx.compose.foundation.lazy.LazyListScope.datedItems(
             item(key = "day-$day-$index") {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(start = 18.dp, top = 14.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = 18.dp, top = 10.dp, bottom = 2.dp),
                 ) {
                     Box(
                         Modifier
@@ -826,17 +826,17 @@ private fun TrackLine(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 3.dp),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Cover(track.coverUrl, 52)
+            Cover(track.coverUrl, 46)
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 10.dp),
             ) {
                 Text(
                     track.title.ifEmpty { track.number },
@@ -854,7 +854,7 @@ private fun TrackLine(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = 2.dp),
                 )
                 if (downloaded) {
                     DownloadBadge(Modifier.padding(top = 5.dp))
@@ -900,17 +900,17 @@ private fun SubscriptionLine(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 3.dp),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Cover(item.album.coverUrl, 56)
+            Cover(item.album.coverUrl, 48)
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 10.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -933,7 +933,7 @@ private fun SubscriptionLine(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
             TextButton(onClick = { onUnsubscribe(item.album.id) }) {
@@ -964,7 +964,7 @@ private fun HistoryLine(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 3.dp),
     ) {
     Surface(
         onClick = if (editing) onToggle else onPlay,
@@ -973,7 +973,7 @@ private fun HistoryLine(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (editing) {
@@ -989,11 +989,11 @@ private fun HistoryLine(
                 )
                 Spacer(Modifier.width(10.dp))
             }
-            Cover(record.track.coverUrl, 52)
+            Cover(record.track.coverUrl, 46)
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 10.dp),
             ) {
                 Text(
                     record.track.title.ifEmpty { record.track.number },
@@ -1011,18 +1011,18 @@ private fun HistoryLine(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 3.dp),
+                    modifier = Modifier.padding(top = 2.dp),
                 )
                 if (downloaded) {
-                    DownloadBadge(Modifier.padding(top = 5.dp))
+                    DownloadBadge(Modifier.padding(top = 4.dp))
                 }
                 if (progress != null) {
                     LinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 6.dp)
-                            .height(4.dp)
+                            .padding(top = 4.dp)
+                            .height(3.dp)
                             .clip(CircleShape),
                     )
                 }

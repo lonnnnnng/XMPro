@@ -6,6 +6,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -16,6 +17,33 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+
+// long: 全局文字只收紧少量，保留 Material 3 的字号层级与系统字体缩放响应。
+private val CompactTypography = Typography().compact(scale = 0.96f)
+
+private fun Typography.compact(scale: Float): Typography = copy(
+    displayLarge = displayLarge.compact(scale),
+    displayMedium = displayMedium.compact(scale),
+    displaySmall = displaySmall.compact(scale),
+    headlineLarge = headlineLarge.compact(scale),
+    headlineMedium = headlineMedium.compact(scale),
+    headlineSmall = headlineSmall.compact(scale),
+    titleLarge = titleLarge.compact(scale),
+    titleMedium = titleMedium.compact(scale),
+    titleSmall = titleSmall.compact(scale),
+    bodyLarge = bodyLarge.compact(scale),
+    bodyMedium = bodyMedium.compact(scale),
+    bodySmall = bodySmall.compact(scale),
+    labelLarge = labelLarge.compact(scale),
+    labelMedium = labelMedium.compact(scale),
+    labelSmall = labelSmall.compact(scale),
+)
+
+private fun TextStyle.compact(scale: Float): TextStyle = copy(
+    fontSize = fontSize * scale,
+    lineHeight = lineHeight * scale,
+)
 
 /** Mirrors AppAppearance.defaultSeedColor from the previous Flutter theme. */
 val DefaultSeedColor = Color(0xFFE57373)
@@ -192,7 +220,7 @@ fun XmproTheme(
     } else {
         base
     }
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(colorScheme = scheme, typography = CompactTypography, content = content)
 }
 
 /**
