@@ -19,8 +19,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 
-// long: 全局文字只收紧少量，保留 Material 3 的字号层级与系统字体缩放响应。
-private val CompactTypography = Typography().compact(scale = 0.96f)
+// long: 全局字号统一收紧以增加首屏信息量，同时保留 Material 3 层级和系统字体缩放响应。
+private val CompactTypography = Typography().compact(scale = 0.90f)
 
 private fun Typography.compact(scale: Float): Typography = copy(
     displayLarge = displayLarge.compact(scale),
@@ -43,6 +43,7 @@ private fun Typography.compact(scale: Float): Typography = copy(
 private fun TextStyle.compact(scale: Float): TextStyle = copy(
     fontSize = fontSize * scale,
     lineHeight = lineHeight * scale,
+    letterSpacing = letterSpacing * scale,
 )
 
 /** Mirrors AppAppearance.defaultSeedColor from the previous Flutter theme. */

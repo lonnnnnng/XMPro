@@ -43,7 +43,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 data class FloatingNavItem(
     val title: String,
@@ -173,7 +172,7 @@ fun FloatingBottomBar(
                             )
                             Text(
                                 text = item.title,
-                                fontSize = 11.sp,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                 color = if (selected) {
                                     MaterialTheme.colorScheme.primary
