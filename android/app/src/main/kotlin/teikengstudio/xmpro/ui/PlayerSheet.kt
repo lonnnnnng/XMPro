@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -69,10 +70,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -132,6 +135,12 @@ fun PlayerSheet(
     var downloadOpen by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableFloatStateOf(-1f) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val configuration = LocalConfiguration.current
+    val artworkSize = minOf(
+        260.dp,
+        (configuration.screenWidthDp - 64).dp,
+        configuration.screenHeightDp.dp * 0.31f,
+    ).coerceAtLeast(160.dp)
 
     BackHandler {
         when {
@@ -181,20 +190,21 @@ fun PlayerSheet(
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(6.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val cover = track?.coverUrl
                 if (cover != null) {
                     Box(
                         Modifier
+                            .size(artworkSize)
                             .shadow(elevation = 18.dp, shape = RoundedCornerShape(28.dp), clip = false),
                     ) {
-                        Cover(cover, 260)
+                        Cover(cover, artworkSize.value.toInt())
                     }
                 } else {
                     Box(
                         Modifier
-                            .size(260.dp)
+                            .size(artworkSize)
                             .clip(RoundedCornerShape(28.dp))
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center,
@@ -203,7 +213,7 @@ fun PlayerSheet(
                             Icons.Filled.PlayArrow,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(80.dp),
+                            modifier = Modifier.size(artworkSize * 0.3f),
                         )
                     }
                 }
@@ -213,7 +223,7 @@ fun PlayerSheet(
                 track?.title ?: "尚未选择声音",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 22.dp),
+                    .padding(top = 16.dp),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -239,107 +249,6 @@ fun PlayerSheet(
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )
-
-            Row(
-                Modifier.fillMaxWidth().padding(top = 14.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PlayerActionButton(
-                    label = speedChipLabel(state.speed),
-                    active = state.speed != 1f,
-                    onClick = { speedOpen = true },
-                )
-                PlayerActionIcon(
-                    icon = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                    label = if (isFavorite) "已收藏" else "收藏",
-                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    enabled = track != null,
-                    onClick = onFavorite,
-                )
-                // Offline copy of the episode that is playing right now.
-                val savedState = state.downloads.firstOrNull { it.id == track?.id }
-                PlayerActionIcon(
-                    icon = when (savedState?.state) {
-                        null -> Icons.Filled.FileDownload
-                        teikengstudio.xmpro.download.DownloadState.DONE -> Icons.Filled.DownloadDone
-                        teikengstudio.xmpro.download.DownloadState.FAILED -> Icons.Filled.Refresh
-                        else -> Icons.Filled.FileDownload
-                    },
-                    label = when (savedState?.state) {
-                        null -> "下载"
-                        teikengstudio.xmpro.download.DownloadState.DONE -> "已下载"
-                        teikengstudio.xmpro.download.DownloadState.FAILED -> "重试下载"
-                        teikengstudio.xmpro.download.DownloadState.PAUSED -> "已暂停"
-                        else -> "下载中"
-                    },
-                    tint = if (savedState == null) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                    // A finished file needs no second tap; the download page owns deletion.
-                    enabled = track != null && savedState?.state != teikengstudio.xmpro.download.DownloadState.DONE,
-                    onClick = { if (savedState == null) downloadOpen = true else onDownload(null) },
-                )
-                PlayerActionIcon(
-                    icon = Icons.Filled.ChatBubbleOutline,
-                    label = "评论",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    enabled = track != null,
-                    onClick = onOpenComments,
-                )
-                PlayerActionIcon(
-                    icon = Icons.Filled.BookmarkBorder,
-                    label = "书签",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    enabled = track != null,
-                    onClick = onBookmark,
-                )
-                PlayerActionIcon(
-                    icon = Icons.Filled.Timer,
-                    label = when {
-                        state.sleepAtTrackEnd -> "播完停"
-                        state.sleepAtMillis != null -> "已定时"
-                        else -> "定时"
-                    },
-                    tint = if (state.sleepAtMillis != null || state.sleepAtTrackEnd) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    enabled = true,
-                    onClick = { timerOpen = true },
-                )
-                // Tap toggles the trim, long press opens the sliders for it.
-                PlayerActionIcon(
-                    icon = if (state.skipTrimEnabled) {
-                        Icons.Filled.TaskAlt
-                    } else {
-                        Icons.Filled.SkipNext
-                    },
-                    label = "跳过头尾",
-                    tint = if (state.skipTrimEnabled) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    enabled = track != null,
-                    onClick = {
-                        val turningOn = !state.skipTrimEnabled
-                        onSkipTrim(
-                            turningOn,
-                            state.introSkipPermille,
-                            state.outroSkipPermille,
-                            state.skipTrimMode,
-                        )
-                        // Switching on also opens the sliders, so the trim can
-                        // be adjusted straight away instead of hunting for it
-                        // in settings.
-                        if (turningOn) trimOpen = true
-                    },
-                )
-            }
 
             val total = state.durationMs.coerceAtLeast(0)
             val livePosition by positionMs.collectAsState()
@@ -367,40 +276,6 @@ fun PlayerSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.weight(1f))
-                // One line carries both facts the user cares about here: what
-                // arrived (the tier is not always the requested one) and the
-                // current sound preset.
-                Row(
-                    Modifier
-                        .clip(RoundedCornerShape(50))
-                        .clickable { effectOpen = true }
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // A downloaded episode reports "本地文件", which is not a
-                    // quality code; show it as-is instead of hiding the label.
-                    val quality = formatQuality(state.playingQuality)
-                        .ifEmpty { state.playingQuality }
-                    if (quality.isNotEmpty()) {
-                        Text(
-                            quality,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                        )
-                        Text(
-                            " · ",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    val preset = teikengstudio.xmpro.player.EffectPreset.of(state.effectPreset)
-                    Text(
-                        if (preset == teikengstudio.xmpro.player.EffectPreset.Off) "音效" else "音效·${preset.label}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                Spacer(Modifier.weight(1f))
                 Text(
                     formatDuration(total / 1000.0),
                     style = MaterialTheme.typography.labelSmall,
@@ -408,42 +283,8 @@ fun PlayerSheet(
                 )
             }
 
-            // Playback volume, not the device stream: it stays put when the
-            // phone is also playing notifications or another app is audible.
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    when {
-                        state.playVolume <= 0.01f -> Icons.Filled.VolumeMute
-                        state.playVolume < 0.5f -> Icons.Filled.VolumeDown
-                        else -> Icons.Filled.VolumeUp
-                    },
-                    contentDescription = "音量",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-                Slider(
-                    value = state.playVolume,
-                    onValueChange = onVolume,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp),
-                )
-                Text(
-                    "${(state.playVolume * 100).roundToInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(38.dp),
-                    textAlign = TextAlign.End,
-                )
-            }
-
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
+                Modifier.fillMaxWidth().padding(top = 2.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -470,6 +311,154 @@ fun PlayerSheet(
                 IconButton(onClick = { onSkip(30_000) }) {
                     Icon(Icons.Filled.Forward30, contentDescription = "前进 30 秒")
                 }
+            }
+
+            // long: 音质和音效属于辅助播放设置，放在主控制之后，给时间读数和切集留出清晰位置。
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { effectOpen = true }
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val quality = formatQuality(state.playingQuality).ifEmpty { state.playingQuality }
+                Text(
+                    quality.ifEmpty { "音质" },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                val preset = teikengstudio.xmpro.player.EffectPreset.of(state.effectPreset)
+                Text(
+                    if (preset == teikengstudio.xmpro.player.EffectPreset.Off) "音效" else "音效 · ${preset.label}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            val savedState = state.downloads.firstOrNull { it.id == track?.id }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PlayerActionButton(
+                    label = speedChipLabel(state.speed),
+                    active = state.speed != 1f,
+                    onClick = { speedOpen = true },
+                )
+                PlayerActionIcon(
+                    icon = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    label = if (isFavorite) "已收藏" else "收藏",
+                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    enabled = track != null,
+                    onClick = onFavorite,
+                )
+                PlayerActionIcon(
+                    icon = when (savedState?.state) {
+                        null -> Icons.Filled.FileDownload
+                        teikengstudio.xmpro.download.DownloadState.DONE -> Icons.Filled.DownloadDone
+                        teikengstudio.xmpro.download.DownloadState.FAILED -> Icons.Filled.Refresh
+                        else -> Icons.Filled.FileDownload
+                    },
+                    label = when (savedState?.state) {
+                        null -> "下载"
+                        teikengstudio.xmpro.download.DownloadState.DONE -> "已下载"
+                        teikengstudio.xmpro.download.DownloadState.FAILED -> "重试下载"
+                        teikengstudio.xmpro.download.DownloadState.PAUSED -> "已暂停"
+                        else -> "下载中"
+                    },
+                    tint = if (savedState == null) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.primary,
+                    // A finished file needs no second tap; the download page owns deletion.
+                    enabled = track != null && savedState?.state != teikengstudio.xmpro.download.DownloadState.DONE,
+                    onClick = { if (savedState == null) downloadOpen = true else onDownload(null) },
+                )
+                PlayerActionIcon(
+                    icon = Icons.Filled.ChatBubbleOutline,
+                    label = "评论",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    enabled = track != null,
+                    onClick = onOpenComments,
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PlayerActionIcon(
+                    icon = Icons.Filled.BookmarkBorder,
+                    label = "书签",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    enabled = track != null,
+                    onClick = onBookmark,
+                )
+                PlayerActionIcon(
+                    icon = Icons.Filled.Timer,
+                    label = when {
+                        state.sleepAtTrackEnd -> "播完停"
+                        state.sleepAtMillis != null -> "已定时"
+                        else -> "定时"
+                    },
+                    tint = if (state.sleepAtMillis != null || state.sleepAtTrackEnd) {
+                        MaterialTheme.colorScheme.primary
+                    } else MaterialTheme.colorScheme.onSurfaceVariant,
+                    enabled = true,
+                    onClick = { timerOpen = true },
+                )
+                // long: 点击开关头尾跳过，长按可以直接调节跳过范围。
+                PlayerActionIcon(
+                    icon = if (state.skipTrimEnabled) Icons.Filled.TaskAlt else Icons.Filled.SkipNext,
+                    label = "跳过头尾",
+                    tint = if (state.skipTrimEnabled) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    enabled = track != null,
+                    onClick = {
+                        val turningOn = !state.skipTrimEnabled
+                        onSkipTrim(
+                            turningOn,
+                            state.introSkipPermille,
+                            state.outroSkipPermille,
+                            state.skipTrimMode,
+                        )
+                        if (turningOn) trimOpen = true
+                    },
+                )
+            }
+
+            // long: 应用内音量与系统媒体音量分开，归入辅助区以保持主播放控件连贯。
+            Row(
+                Modifier.fillMaxWidth().padding(top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    when {
+                        state.playVolume <= 0.01f -> Icons.Filled.VolumeMute
+                        state.playVolume < 0.5f -> Icons.Filled.VolumeDown
+                        else -> Icons.Filled.VolumeUp
+                    },
+                    contentDescription = "音量",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+                Slider(
+                    value = state.playVolume,
+                    onValueChange = onVolume,
+                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                )
+                Text(
+                    "${(state.playVolume * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(42.dp),
+                    maxLines = 1,
+                    textAlign = TextAlign.End,
+                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -811,6 +800,7 @@ private fun PlayerActionButton(
                     MaterialTheme.colorScheme.surfaceContainerLow
                 },
             )
+            .heightIn(min = 48.dp)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -885,25 +875,29 @@ private fun PlayerActionIcon(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // A plain Box rather than IconButton: IconButton swallows the long
-        // press, so the trim editor could never be reached from here.
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .widthIn(min = 64.dp)
+            .heightIn(min = 72.dp)
+            .combinedClickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            .alpha(if (enabled) 1f else 0.45f),
+    ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(40.dp)
+                .size(48.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .combinedClickable(
-                    enabled = enabled,
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                )
-                .alpha(if (enabled) 1f else 0.45f),
+                .background(MaterialTheme.colorScheme.surfaceContainerLow),
         ) {
             Icon(
                 icon,
-                contentDescription = label,
+                contentDescription = null,
                 tint = tint,
                 modifier = Modifier.size(20.dp),
             )
