@@ -3,8 +3,10 @@ package teikengstudio.xmpro.download
 import android.content.Context
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -211,45 +213,85 @@ class DownloadManager(
         val file = fileFor(task.track, resolved.url)
         file.parentFile?.mkdirs()
         if (file.absolutePath != task.path) update(task.id) { it.copy(path = file.absolutePath) }
-        val have = if (file.isFile) file.length() else 0L
-        val request = Request.Builder()
-            .url(resolved.url)
-            .apply {
-                resolved.headers.forEach { (key, value) -> header(key, value) }
-                if (have > 0) header("Range", "bytes=$have-")
+        var have = if (file.isFile) file.length() else 0L
+        var restarted = false
+        while (true) {
+            val request = Request.Builder()
+                .url(resolved.url)
+                .apply {
+                    resolved.headers.forEach { (key, value) -> header(key, value) }
+                    if (have > 0) header("Range", "bytes=$have-")
+                }
+                .build()
+            val response = http.newCall(request).execute()
+            if (response.code == 416) {
+                val expected = response.header("Content-Range")
+                    ?.substringAfterLast('/')
+                    ?.toLongOrNull()
+                response.close()
+                if (expected != null && expected > 0 && file.length() == expected) return@withContext file.absolutePath
+                if (restarted) throw IOException("续传范围与服务器文件长度不符")
+                // long: 服务器拒绝续传且本地长度无法证明完整时，清空残片并重新请求整段音频。
+                file.outputStream().use { }
+                have = 0L
+                restarted = true
+                continue
             }
-            .build()
-        http.newCall(request).execute().use { response ->
-            if (response.code == 416) return@use file.absolutePath
-            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
-            val body = response.body ?: throw IOException("响应体为空")
-            val length = body.contentLength()
-            val total = if (length > 0) length + have else 0L
-            if (total > 0) update(task.id) { it.copy(total = total, quality = resolved.actualQuality) }
-            body.byteStream().use { input ->
-                file.outputStream().use { output ->
-                    // Appending keeps a resumed download's earlier bytes.
-                    if (have > 0) output.channel.position(have)
-                    val buffer = ByteArray(64 * 1024)
-                    var written = have
-                    var lastPublish = 0L
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        if (_tasks.value.firstOrNull { it.id == task.id }?.state != DownloadState.RUNNING) break
-                        output.write(buffer, 0, read)
-                        written += read
-                        val now = System.currentTimeMillis()
-                        if (now - lastPublish > 400) {
-                            lastPublish = now
-                            update(task.id) { it.copy(received = written) }
+            response.use {
+                if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
+                val body = it.body ?: throw IOException("响应体为空")
+                val offset = if (it.code == 206) {
+                    val range = CONTENT_RANGE.matchEntire(it.header("Content-Range").orEmpty())
+                        ?: throw IOException("服务器未提供有效的续传范围")
+                    val start = range.groupValues[1].toLong()
+                    if (start != have) throw IOException("服务器续传起点与本地文件不符")
+                    have
+                } else {
+                    // long: 忽略 Range 的 200 响应从文件头重新写入，避免旧片段和整段音频拼接。
+                    0L
+                }
+                val range = it.header("Content-Range")?.let(CONTENT_RANGE::matchEntire)
+                val expected = if (it.code == 206) {
+                    range?.groupValues?.get(3)?.toLongOrNull()
+                        ?: (offset + body.contentLength().coerceAtLeast(0))
+                } else {
+                    body.contentLength().takeIf { length -> length > 0 } ?: 0L
+                }
+                if (expected > 0) {
+                    update(task.id) { it.copy(total = expected, received = offset, quality = resolved.actualQuality) }
+                }
+                body.byteStream().use { input ->
+                    RandomAccessFile(file, "rw").use { output ->
+                        output.setLength(offset)
+                        output.seek(offset)
+                        val buffer = ByteArray(64 * 1024)
+                        var written = offset
+                        var lastPublish = 0L
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            if (_tasks.value.firstOrNull { taskRow -> taskRow.id == task.id }?.state != DownloadState.RUNNING) {
+                                throw CancellationException("下载已暂停或移除")
+                            }
+                            output.write(buffer, 0, read)
+                            written += read
+                            val now = System.currentTimeMillis()
+                            if (now - lastPublish > 400) {
+                                lastPublish = now
+                                update(task.id) { it.copy(received = written) }
+                            }
                         }
+                        output.fd.sync()
+                        if (_tasks.value.firstOrNull { taskRow -> taskRow.id == task.id }?.state != DownloadState.RUNNING) {
+                            throw CancellationException("下载已暂停或移除")
+                        }
+                        if (expected > 0 && written != expected) throw IOException("音频长度不完整")
                     }
-                    output.flush()
                 }
             }
+            return@withContext file.absolutePath
         }
-        file.absolutePath
+        throw IOException("下载未能完成")
     }
 
     // ------------------------------------------------------------- internals
@@ -289,6 +331,7 @@ class DownloadManager(
     companion object {
         /** Containers the service actually serves; anything else is ignored. */
         private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "flac")
+        private val CONTENT_RANGE = Regex("bytes (\\d+)-(\\d+)/(\\d+|\\*)")
     }
 
     private fun describe(error: Throwable?): String = when (error) {

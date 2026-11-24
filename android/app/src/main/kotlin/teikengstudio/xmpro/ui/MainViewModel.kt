@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -223,6 +224,13 @@ class MainViewModel(private val context: Context, private val container: AppCont
      * start over the track the user picked afterwards.
      */
     private var playRequest = 0
+    /** long: Prevents the tail ticker from starting another automatic skip while a URL is resolving. */
+    private var automaticAdvanceInFlight = false
+    private var homeRequest = 0
+    private var searchRequest = 0
+    private var albumRequest = 0
+    private var albumRangeRequest = 0
+    private var listeningRequest = 0
     /** Guards the automatic recovery so a dead stream cannot loop for ever. */
     private var recoverTrack: String? = null
     private var recoverAttempts = 0
@@ -353,6 +361,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
     // -------------------------------------------------------------------- home
 
     fun loadHome() {
+        val request = ++homeRequest
         _state.update { it.copy(homeLoading = it.channels.isEmpty(), homeError = null) }
         viewModelScope.launch {
             try {
@@ -360,6 +369,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     XmlyExperience(container.client(container.activeAccount))
                 }
                 val channels = withContext(Dispatchers.IO) { experience.channels() }
+                if (request != homeRequest) return@launch
                 if (channels.isEmpty()) throw XmlyException("invalid_home", "首页频道为空")
                 val (visible, hidden) = splitChannels(channels)
                 val selected = _state.value.channelId.takeIf { id -> visible.any { it.pageId == id } }
@@ -367,9 +377,11 @@ class MainViewModel(private val context: Context, private val container: AppCont
                 _state.update {
                     it.copy(channels = visible, hiddenChannels = hidden, channelId = selected)
                 }
-                loadChannel(experience, selected, null)
+                loadChannel(experience, selected, null, request)
             } catch (error: Exception) {
-                _state.update { it.copy(homeLoading = false, homeError = describe(error)) }
+                if (request == homeRequest) {
+                    _state.update { it.copy(homeLoading = false, homeError = describe(error)) }
+                }
             }
         }
     }
@@ -441,6 +453,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
 
     fun selectChannel(pageId: Int) {
         if (_state.value.channelId == pageId) return
+        val request = ++homeRequest
         _state.update {
             it.copy(channelId = pageId, homeLoading = true, homeError = null, sections = emptyList(), tabId = null)
         }
@@ -449,9 +462,11 @@ class MainViewModel(private val context: Context, private val container: AppCont
                 val experience = withContext(Dispatchers.IO) {
                     XmlyExperience(container.client(container.activeAccount))
                 }
-                loadChannel(experience, pageId, null)
+                loadChannel(experience, pageId, null, request)
             }.onFailure { error ->
-                _state.update { it.copy(homeLoading = false, homeError = describe(error)) }
+                if (request == homeRequest) {
+                    _state.update { it.copy(homeLoading = false, homeError = describe(error)) }
+                }
             }
         }
     }
@@ -459,21 +474,24 @@ class MainViewModel(private val context: Context, private val container: AppCont
     fun selectTab(tabId: Int) {
         val pageId = _state.value.channelId
         if (pageId <= 0) return
+        val request = ++homeRequest
         _state.update { it.copy(tabId = tabId, homeLoading = true, homeError = null) }
         viewModelScope.launch {
             runCatching {
                 val experience = withContext(Dispatchers.IO) {
                     XmlyExperience(container.client(container.activeAccount))
                 }
-                loadChannel(experience, pageId, tabId)
+                loadChannel(experience, pageId, tabId, request)
             }.onFailure { error ->
-                _state.update { it.copy(homeLoading = false, homeError = describe(error)) }
+                if (request == homeRequest) {
+                    _state.update { it.copy(homeLoading = false, homeError = describe(error)) }
+                }
             }
         }
     }
 
     /** A channel with tabs loads its first tab, matching the original client. */
-    private fun loadChannel(experience: XmlyExperience, pageId: Int, tabId: Int?) {
+    private fun loadChannel(experience: XmlyExperience, pageId: Int, tabId: Int?, request: Int) {
         viewModelScope.launch {
             try {
                 var content = withContext(Dispatchers.IO) { experience.home(pageId, tabId) }
@@ -482,6 +500,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     selectedTab = content.tabs.first().tabId
                     content = withContext(Dispatchers.IO) { experience.home(pageId, selectedTab) }
                 }
+                if (request != homeRequest) return@launch
                 _state.update {
                     it.copy(
                         sections = content.sections,
@@ -492,8 +511,10 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     )
                 }
             } catch (error: Exception) {
-                _state.update {
-                    it.copy(homeLoading = false, homeError = describe(error), sections = emptyList())
+                if (request == homeRequest) {
+                    _state.update {
+                        it.copy(homeLoading = false, homeError = describe(error), sections = emptyList())
+                    }
                 }
             }
         }
@@ -503,6 +524,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
 
     fun search(query: String, kind: String = _state.value.searchKind) {
         if (query.isBlank()) return
+        val request = ++searchRequest
         _state.update {
             it.copy(
                 query = query,
@@ -523,6 +545,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
                 val page = withContext(Dispatchers.IO) {
                     container.client(container.activeAccount).search(query, kind = kind)
                 }
+                if (request != searchRequest) return@launch
                 _state.update {
                     it.copy(
                         searching = false,
@@ -534,7 +557,9 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     )
                 }
             } catch (error: Exception) {
-                _state.update { it.copy(searching = false, searchError = describe(error)) }
+                if (request == searchRequest) {
+                    _state.update { it.copy(searching = false, searchError = describe(error)) }
+                }
             }
         }
     }
@@ -553,6 +578,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
         if (!snapshot.searchMore) return
         val kind = snapshot.searchKind
         val next = snapshot.searchPage + 1
+        val request = searchRequest
         _state.update { it.copy(searchLoadingMore = true) }
         viewModelScope.launch {
             try {
@@ -563,7 +589,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
                 _state.update { state ->
                     // A keyword typed meanwhile must not be polluted by the page
                     // that was already in flight.
-                    if (state.query != snapshot.query || state.searchKind != kind) {
+                    if (request != searchRequest || state.query != snapshot.query || state.searchKind != kind) {
                         state.copy(searchLoadingMore = false)
                     } else {
                         val tracks = (state.tracks + page.tracks).distinctBy { it.id }
@@ -580,7 +606,9 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     }
                 }
             } catch (error: Exception) {
-                _state.update { it.copy(searchLoadingMore = false, searchMore = false) }
+                if (request == searchRequest) {
+                    _state.update { it.copy(searchLoadingMore = false, searchMore = false) }
+                }
             }
         }
     }
@@ -592,20 +620,25 @@ class MainViewModel(private val context: Context, private val container: AppCont
         return page.tracks.size + page.albums.size >= page.pageSize
     }
 
-    fun clearSearch() = _state.update {
-        it.copy(
-            query = "",
-            tracks = emptyList(),
-            albums = emptyList(),
-            searchError = null,
-            searchPage = 0,
-            searchTotal = 0,
-            searchMore = false,
-            searchLoadingMore = false,
-        )
+    fun clearSearch() {
+        searchRequest++
+        _state.update {
+            it.copy(
+                query = "",
+                tracks = emptyList(),
+                albums = emptyList(),
+                searching = false,
+                searchError = null,
+                searchPage = 0,
+                searchTotal = 0,
+                searchMore = false,
+                searchLoadingMore = false,
+            )
+        }
     }
 
     fun openAlbum(albumId: String) {
+        val request = ++albumRequest
         _state.update { it.copy(album = null, albumLoading = true, albumError = null) }
         viewModelScope.launch {
             try {
@@ -623,23 +656,30 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     }
                     detail.await() to where.await()
                 }
-                _state.update { it.copy(album = page, albumLoading = false, albumResume = resume) }
+                if (request == albumRequest) {
+                    _state.update { it.copy(album = page, albumLoading = false, albumResume = resume) }
+                }
             } catch (error: Exception) {
-                _state.update { it.copy(albumLoading = false, albumError = describe(error)) }
+                if (request == albumRequest) {
+                    _state.update { it.copy(albumLoading = false, albumError = describe(error)) }
+                }
             }
         }
     }
 
-    fun closeAlbum() = _state.update {
-        it.copy(
-            album = null,
-            albumError = null,
-            albumLoading = false,
-            albumRangeStart = null,
-            albumRangeEnd = null,
-            albumRangeBusy = false,
-            albumResume = null,
-        )
+    fun closeAlbum() {
+        albumRequest++
+        _state.update {
+            it.copy(
+                album = null,
+                albumError = null,
+                albumLoading = false,
+                albumRangeStart = null,
+                albumRangeEnd = null,
+                albumRangeBusy = false,
+                albumResume = null,
+            )
+        }
     }
 
     /**
@@ -649,15 +689,17 @@ class MainViewModel(private val context: Context, private val container: AppCont
      */
     fun setAlbumRange(start: Int?, end: Int?) {
         val page = _state.value.album ?: return
+        val request = ++albumRangeRequest
+        val albumRequestAtStart = albumRequest
         if (start == null || end == null) {
-            _state.update { it.copy(albumRangeStart = null, albumRangeEnd = null) }
+            _state.update { it.copy(albumRangeStart = null, albumRangeEnd = null, albumRangeBusy = false) }
             return
         }
         val total = maxOf(page.total, page.tracks.size)
         val from = start.coerceIn(1, total)
         val to = end.coerceIn(from, total)
         if (page.tracks.size >= to) {
-            _state.update { it.copy(albumRangeStart = from, albumRangeEnd = to) }
+            _state.update { it.copy(albumRangeStart = from, albumRangeEnd = to, albumRangeBusy = false) }
             return
         }
         _state.update { it.copy(albumRangeStart = from, albumRangeEnd = to, albumRangeBusy = true) }
@@ -675,8 +717,9 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     }
                     tracks.sortedBy { track -> track.orderNo ?: Int.MAX_VALUE }
                 }
+                if (request != albumRangeRequest || albumRequestAtStart != albumRequest) return@launch
                 _state.update { current ->
-                    val existing = current.album ?: return@update current
+                    val existing = current.album?.takeIf { it.album.id == page.album.id } ?: return@update current
                     current.copy(
                         album = teikengstudio.xmpro.model.AlbumPage(
                             album = existing.album,
@@ -689,7 +732,9 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     )
                 }
             } catch (error: Exception) {
-                _state.update { it.copy(albumRangeBusy = false, message = describe(error)) }
+                if (request == albumRangeRequest && albumRequestAtStart == albumRequest) {
+                    _state.update { it.copy(albumRangeBusy = false, message = describe(error)) }
+                }
             }
         }
     }
@@ -818,8 +863,22 @@ class MainViewModel(private val context: Context, private val container: AppCont
     }
 
     /** Plays [track] inside [queue] so next/previous walk the same list. */
-    fun playQueue(queue: List<Track>, index: Int, resumePositionMs: Long = 0) {
+    fun playQueue(
+        queue: List<Track>,
+        index: Int,
+        resumePositionMs: Long = 0,
+        retryResolveFailures: Boolean = false,
+        automaticAdvance: Boolean = false,
+    ) {
         val track = queue.getOrNull(index) ?: return
+        if (automaticAdvance && automaticAdvanceInFlight) return
+        if (automaticAdvance) {
+            // long: 500 ms 进度轮询可能在下一集地址返回前多次观察到同一片尾位置。
+            automaticAdvanceInFlight = true
+        } else {
+            // A deliberate user selection takes ownership from any pending automatic transition.
+            automaticAdvanceInFlight = false
+        }
         lastPlayStartedAt = System.currentTimeMillis()
         // Report the outgoing track before the player swaps media.
         if (sessionTrack != null && sessionTrack?.id != track.id) syncProgress()
@@ -835,62 +894,87 @@ class MainViewModel(private val context: Context, private val container: AppCont
         }
         val request = ++playRequest
         viewModelScope.launch {
-            try {
-                val quality = _state.value.quality
-                // A downloaded episode plays from disk: no resolution round trip,
-                // no signed URL to expire, and it works with no network at all.
-                val local = container.downloads.localFile(track.id)
-                var url = local?.toURI()?.toString().orEmpty()
-                var played = track
-                var label = if (local != null) "本地文件" else ""
-                if (local == null) {
-                    val resolved = withContext(Dispatchers.IO) {
-                        container.client(container.activeAccount).resolve(track.number, quality)
+            var retry = 0
+            while (true) {
+                try {
+                    val quality = _state.value.quality
+                    // A downloaded episode plays from disk: no resolution round trip,
+                    // no signed URL to expire, and it works with no network at all.
+                    val local = container.downloads.localFile(track.id)
+                    var url = local?.toURI()?.toString().orEmpty()
+                    var played = track
+                    var label = if (local != null) "本地文件" else ""
+                    if (local == null) {
+                        val resolved = withContext(Dispatchers.IO) {
+                            container.client(container.activeAccount).resolve(track.number, quality)
+                        }
+                        url = resolved.url
+                        played = resolved.track
+                        label = resolved.actualQuality
                     }
-                    url = resolved.url
-                    played = resolved.track
-                    label = resolved.actualQuality
-                }
-                // A newer tap already won; drop this result instead of overriding it.
-                if (request != playRequest) return@launch
-                val startAt = if (resumePositionMs > 0) {
-                    resumePositionMs
-                } else {
-                    introSeekMs(played.duration)
-                }
-                playback.setVolume(_state.value.playVolume)
-                playback.setSpeed(_state.value.speed)
-                // The resolve payload does not always carry the length, but the
-                // catalogue entry does; the notification needs it to show a total.
-                val durationSeconds = played.duration.takeIf { it > 0 }
-                    ?: queue.getOrNull(index)?.duration
-                    ?: 0.0
-                playback.start(
-                    url = url,
-                    title = played.title,
-                    artist = listOfNotNull(
-                        played.album.takeIf { it.isNotEmpty() },
-                        played.artist.takeIf { it.isNotEmpty() },
-                    ).joinToString(" · "),
-                    artworkUrl = played.coverUrl,
-                    mediaId = played.id,
-                    durationMs = (durationSeconds * 1000).toLong(),
-                    startPositionMs = startAt,
-                ) {
-                    if (request != playRequest) return@start
-                    sessionTrack = played
-                    sessionStartedAt = System.currentTimeMillis()
-                    sessionIdentity = container.activeAccount
-                    _state.update { it.copy(playing = played, playingQuality = label) }
-                    publishQueue()
-                    // Record the switch immediately: leaving the app straight
-                    // after picking another episode must still move the cloud
-                    // history, and the exit write may not survive the process.
-                    syncProgress()
-                }
-            } catch (error: Exception) {
-                if (request == playRequest) {
-                    _state.update { it.copy(message = describe(error)) }
+                    // A newer tap already won; drop this result instead of overriding it.
+                    if (request != playRequest) return@launch
+                    val startAt = if (resumePositionMs > 0) {
+                        resumePositionMs
+                    } else {
+                        introSeekMs(played.duration)
+                    }
+                    playback.setVolume(_state.value.playVolume)
+                    playback.setSpeed(_state.value.speed)
+                    // The resolve payload does not always carry the length, but the
+                    // catalogue entry does; the notification needs it to show a total.
+                    val durationSeconds = played.duration.takeIf { it > 0 }
+                        ?: queue.getOrNull(index)?.duration
+                        ?: 0.0
+                    playback.start(
+                        url = url,
+                        title = played.title,
+                        artist = listOfNotNull(
+                            played.album.takeIf { it.isNotEmpty() },
+                            played.artist.takeIf { it.isNotEmpty() },
+                        ).joinToString(" · "),
+                        artworkUrl = played.coverUrl,
+                        mediaId = played.id,
+                        durationMs = (durationSeconds * 1000).toLong(),
+                        startPositionMs = startAt,
+                    ) {
+                        if (request != playRequest) return@start
+                        automaticAdvanceInFlight = false
+                        sessionTrack = played
+                        sessionStartedAt = System.currentTimeMillis()
+                        sessionIdentity = container.activeAccount
+                        _state.update { it.copy(playing = played, playingQuality = label) }
+                        publishQueue()
+                        // Record the switch immediately: leaving the app straight
+                        // after picking another episode must still move the cloud
+                        // history, and the exit write may not survive the process.
+                        syncProgress()
+                    }
+                    return@launch
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    if (request != playRequest) return@launch
+                    val canRetry = retryResolveFailures &&
+                        (error as? XmlyException)?.definitive != true &&
+                        retry < MAX_QUEUE_RESOLVE_RETRIES
+                    if (canRetry) {
+                        retry++
+                        _state.update { it.copy(message = "下一集连接暂时不可用，正在重试…") }
+                        // 锁屏跨集时短暂网络抖动不能直接结束整张队列；退避有限且可被新操作取消。
+                        delay(QUEUE_RESOLVE_RETRY_DELAY_MS * retry)
+                    } else {
+                        automaticAdvanceInFlight = false
+                        val current = _state.value
+                        val playingIndex = current.queue.indexOfFirst { it.id == current.playing?.id }
+                        _state.update {
+                            it.copy(
+                                queueIndex = playingIndex.takeIf { value -> value >= 0 } ?: it.queueIndex,
+                                message = describe(error),
+                            )
+                        }
+                        publishQueue()
+                        return@launch
+                    }
                 }
             }
         }
@@ -1018,7 +1102,12 @@ class MainViewModel(private val context: Context, private val container: AppCont
             return
         }
         if (current.queueIndex < current.queue.lastIndex) {
-            playQueue(current.queue, current.queueIndex + 1)
+            playQueue(
+                current.queue,
+                current.queueIndex + 1,
+                retryResolveFailures = true,
+                automaticAdvance = true,
+            )
         } else {
             _state.update { it.copy(isPlaying = false) }
         }
@@ -1333,7 +1422,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
             if (latest.playing?.id != track.id || latest.isPlaying) return@launch
             val index = latest.queue.indexOfFirst { it.id == track.id }
             if (index >= 0) {
-                playQueue(latest.queue, index, resumeAt)
+                playQueue(latest.queue, index, resumeAt, retryResolveFailures = true)
             } else {
                 play(track, resumeAt)
             }
@@ -1379,6 +1468,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
         publishQueue()
         // Cancel any in-flight resolve so stopping cannot be undone by a late reply.
         playRequest++
+        automaticAdvanceInFlight = false
         syncProgress()
         sessionTrack = null
         sessionStartedAt = 0
@@ -1814,11 +1904,18 @@ class MainViewModel(private val context: Context, private val container: AppCont
                 val outro = if (manual) duration * current.outroSkipPermille / 1000L else 0L
                 if (outro > 0 && duration > outro + 2000L && position >= duration - outro) {
                     // Skip the credits by rolling to the next episode.
-                    if (current.queueIndex < current.queue.lastIndex) {
-                        lastAdvanceAt = System.currentTimeMillis()
-                        playQueue(current.queue, current.queueIndex + 1)
-                    } else {
-                        playback.toggle()
+                    if (!automaticAdvanceInFlight) {
+                        if (current.queueIndex < current.queue.lastIndex) {
+                            lastAdvanceAt = System.currentTimeMillis()
+                            playQueue(
+                                current.queue,
+                                current.queueIndex + 1,
+                                retryResolveFailures = true,
+                                automaticAdvance = true,
+                            )
+                        } else {
+                            playback.toggle()
+                        }
                     }
                 }
                 sinceSync += 500
@@ -1838,14 +1935,17 @@ class MainViewModel(private val context: Context, private val container: AppCont
             _state.update { it.copy(subscriptions = emptyList(), updates = emptyList(), history = emptyList(), favorites = emptyList()) }
             return
         }
+        val identity = container.activeAccount
+        val request = ++listeningRequest
         // What is already on screen decides how loudly a failure is reported.
         val before = _state.value
         _state.update { it.copy(listeningLoading = true, listeningError = null) }
         viewModelScope.launch {
-            val identity = container.activeAccount
             if (identity == null) {
                 // Without this the spinner stays up for ever on a half-signed-in state.
-                _state.update { it.copy(listeningLoading = false, listeningError = "登录信息已失效") }
+                if (request == listeningRequest) {
+                    _state.update { it.copy(listeningLoading = false, listeningError = "登录信息已失效") }
+                }
                 return@launch
             }
             val experience = XmlyExperience(container.client(identity))
@@ -1859,6 +1959,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
                 val favs = async(Dispatchers.IO) { runCatching { experience.favorites(1) } }
                 ListeningLoad(subs.await(), feed.await(), history.await(), favs.await())
             }
+            if (request != listeningRequest || identity != container.activeAccount) return@launch
             // Naming the section makes a failure actionable instead of a bare
             // "首页数据无效" over a screen that mostly loaded.
             // A shelf that already has rows keeps them when only the refresh
@@ -2134,6 +2235,11 @@ class MainViewModel(private val context: Context, private val container: AppCont
     }
 
     fun signOut() {
+        listeningRequest++
+        homeRequest++
+        searchRequest++
+        albumRequest++
+        albumRangeRequest++
         val identity = _state.value.account
         container.signOut(identity)
         _state.update {
@@ -2202,6 +2308,11 @@ class MainViewModel(private val context: Context, private val container: AppCont
      */
     fun switchAccount(identity: String) {
         if (identity == _state.value.account) return
+        listeningRequest++
+        homeRequest++
+        searchRequest++
+        albumRequest++
+        albumRangeRequest++
         viewModelScope.launch {
             _state.update { it.copy(accountBusy = true) }
             try {
@@ -2362,6 +2473,8 @@ class MainViewModel(private val context: Context, private val container: AppCont
         /** Covers an expired URL plus a couple of dropped sockets. */
         private const val MAX_PLAYBACK_RECOVERIES = 3
         private const val RECOVERY_DELAY_MS = 2_000L
+        private const val MAX_QUEUE_RESOLVE_RETRIES = 3
+        private const val QUEUE_RESOLVE_RETRY_DELAY_MS = 1_000L
 
         /** Pages fetched per round when growing the queue. */
         private const val QUEUE_PAGE_FETCH = 3

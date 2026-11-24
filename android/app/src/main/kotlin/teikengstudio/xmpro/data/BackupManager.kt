@@ -70,8 +70,9 @@ class BackupManager(private val container: AppContainer) {
             }
         }
 
-        container.replaceState(state)
         for (entry in restored) container.saveCredentials(entry.credentials)
+        // long: 先恢复凭据，再加载备份里的活动账号，避免新设备把有效账号误判为空。
+        container.replaceState(state)
         return ImportResult(
             accounts = restored.size,
             subscriptions = state.optJSONObject("library")?.length() ?: 0,

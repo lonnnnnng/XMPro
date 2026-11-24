@@ -141,7 +141,8 @@ class PlaybackController(private val context: Context) {
             _state.update {
                 it.copy(
                     title = title,
-                    playing = true,
+                    // long: prepare()/play() 只表示开始加载，恢复预算要等真实出声后才清零。
+                    playing = media.isPlaying,
                     positionMs = startPositionMs.coerceAtLeast(0),
                     durationMs = 0,
                 )

@@ -174,7 +174,7 @@ class XmlyHistory(
             client.collector,
             "/nyx/v1/history/merge/android",
             form = form,
-            readOnly = true,
+            readOnly = false,
         )
         val point = data(response).opt("syncPoint")?.toString()?.toLongOrNull() ?: -1
         if (point < 0) throw XmlyException("history_unconfirmed", "未能确认历史进度同步")
