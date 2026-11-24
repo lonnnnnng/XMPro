@@ -1,5 +1,7 @@
 package teikengstudio.xmpro.player
 
+import android.app.PendingIntent
+import android.content.Intent
 import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -20,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import teikengstudio.xmpro.MainActivity
 
 /**
  * Hosts the single ExoPlayer instance for the process so playback keeps running
@@ -162,8 +165,18 @@ class PlaybackService : MediaSessionService() {
             EffectBus.state.collect { state -> effects.apply(audioSessionId, state) }
         }
         player = exo
+        val sessionActivity = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         session = MediaSession.Builder(this, exo)
             .setCallback(callback)
+            // long: 系统媒体卡片需要明确的 Activity 入口，点击卡片才能返回正在播放的应用。
+            .setSessionActivity(sessionActivity)
             // The default loader already fetches https artwork, which is what the
             // notification and lock screen need.
             .build()
