@@ -20,7 +20,7 @@ import java.security.MessageDigest
  * prepended to the plain GitHub URL, which is how the common accelerators work.
  */
 object Updater {
-    private const val OWNER = "angusdevgo"
+    private const val OWNER = "lonnnnnng"
     private const val REPO = "XMPro"
     private const val LATEST = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
     const val WEB_URL = "https://github.com/$OWNER/$REPO"

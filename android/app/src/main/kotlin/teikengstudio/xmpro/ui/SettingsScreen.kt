@@ -2024,7 +2024,7 @@ private fun AboutPage(
                 modifier = Modifier.padding(top = 4.dp),
             )
             Text(
-                "by Angus",
+                "lonnnnnng/XMPro",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
                 modifier = Modifier.padding(top = 2.dp),
@@ -2042,7 +2042,7 @@ private fun AboutPage(
             GroupDivider()
             SettingsRow(
                 title = "检查更新",
-                subtitle = if (state.updateChecking) "正在连接 GitHub…" else "连接官方仓库获取最新版本",
+                subtitle = if (state.updateChecking) "正在连接 GitHub…" else "检查 lonnnnnng/XMPro 的最新版本",
                 icon = Icons.Filled.Refresh,
                 onClick = { if (!state.updateChecking) onCheckUpdate() },
             )
