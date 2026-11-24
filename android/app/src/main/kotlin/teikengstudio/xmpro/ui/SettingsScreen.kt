@@ -595,9 +595,9 @@ private fun SettingsRoot(
     ) {
         Text(
             "我的",
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 8.dp, top = 16.dp, bottom = 10.dp),
+            modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 6.dp),
         )
         SettingsGroup {
             ProfileHeader(
@@ -616,6 +616,7 @@ private fun SettingsRoot(
                 title = "账号与听时",
                 subtitle = if (current == null) "未登录" else "多账号、听时领取与登录方式",
                 icon = Icons.Filled.Person,
+                compact = true,
                 onClick = { onNavigate(SettingsPage.Account) },
             )
             GroupDivider()
@@ -623,6 +624,7 @@ private fun SettingsRoot(
                 title = "播放设置",
                 subtitle = "音质 · 跳过头尾",
                 icon = Icons.Filled.PlayCircleOutline,
+                compact = true,
                 onClick = { onNavigate(SettingsPage.Playback) },
             )
             GroupDivider()
@@ -635,6 +637,7 @@ private fun SettingsRoot(
                         formatBytes(state.downloads.sumOf { it.total.coerceAtLeast(it.received) })
                 },
                 icon = Icons.Filled.FileDownload,
+                compact = true,
                 onClick = { onNavigate(SettingsPage.Downloads) },
             )
             GroupDivider()
@@ -642,6 +645,7 @@ private fun SettingsRoot(
                 title = "外观",
                 subtitle = themeLabel(themeMode),
                 icon = Icons.Filled.Palette,
+                compact = true,
                 onClick = { onNavigate(SettingsPage.Appearance) },
             )
             GroupDivider()
@@ -649,6 +653,7 @@ private fun SettingsRoot(
                 title = "备份与恢复",
                 subtitle = "导出订阅、书签与登录信息",
                 icon = Icons.Filled.SaveAlt,
+                compact = true,
                 onClick = { onNavigate(SettingsPage.Backup) },
             )
             GroupDivider()
@@ -656,6 +661,7 @@ private fun SettingsRoot(
                 title = "关于",
                 subtitle = "版本信息与许可",
                 icon = Icons.Filled.Info,
+                compact = true,
                 onClick = { onNavigate(SettingsPage.About) },
             )
         }
@@ -675,11 +681,11 @@ private fun ProfileHeader(
     onOpenSocial: (String) -> Unit,
 ) {
     var switchOpen by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+    Column(Modifier.fillMaxWidth().padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(58.dp)
+                    .size(52.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
@@ -708,7 +714,7 @@ private fun ProfileHeader(
                     )
                 }
             }
-            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(
                     account?.nickname?.ifEmpty { "喜马拉雅账号" } ?: "未登录",
                     style = MaterialTheme.typography.titleMedium,
@@ -728,7 +734,9 @@ private fun ProfileHeader(
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 3.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
             if (account != null && state.accounts.size > 1) {
@@ -756,10 +764,10 @@ private fun ProfileHeader(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp)
+                .padding(top = 10.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(vertical = 12.dp),
+                .padding(vertical = 2.dp),
         ) {
             Stat(
                 account?.following?.toString() ?: "—",
@@ -795,10 +803,12 @@ private fun ProfileHeader(
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 10.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 6.dp),
             )
             Row(
-                Modifier.fillMaxWidth().padding(top = 10.dp),
+                Modifier.fillMaxWidth().padding(top = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // Neutral like its neighbours: the balance check is not the
@@ -1110,24 +1120,26 @@ private fun GroupTitle(text: String) {
     )
 }
 
+/** long: 仅“我的”首页使用紧凑行高，其他设置页保留标准间距和字号。 */
 @Composable
 private fun SettingsRow(
     title: String,
     subtitle: String,
     icon: ImageVector,
+    compact: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .size(if (compact) 32.dp else 36.dp)
+                .clip(RoundedCornerShape(if (compact) 9.dp else 10.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center,
         ) {
@@ -1135,22 +1147,25 @@ private fun SettingsRow(
                 icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(19.dp),
+                modifier = Modifier.size(if (compact) 17.dp else 19.dp),
             )
         }
         Column(
             Modifier
                 .weight(1f)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = if (compact) 10.dp else 12.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                title,
+                style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium,
+            )
             Text(
                 subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
+                modifier = Modifier.padding(top = if (compact) 1.dp else 2.dp),
             )
         }
         Icon(
@@ -1362,10 +1377,11 @@ private fun LoginEntry(onAddCookie: () -> Unit, onAddSms: () -> Unit) {
 
 @Composable
 private fun Stat(value: String, label: String, modifier: Modifier = Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    // long: 统计数字降低一档以减轻顶部视觉重量，同时保留至少 48dp 点击高度。
+    Column(modifier.heightIn(min = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             value,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
@@ -1374,7 +1390,6 @@ private fun Stat(value: String, label: String, modifier: Modifier = Modifier) {
             label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp),
         )
     }
 }
