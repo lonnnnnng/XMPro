@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.TextStyle
 
 // long: 全局字号统一收紧以增加首屏信息量，同时保留 Material 3 层级和系统字体缩放响应。
@@ -45,6 +46,28 @@ private fun TextStyle.compact(scale: Float): TextStyle = copy(
     lineHeight = lineHeight * scale,
     letterSpacing = letterSpacing * scale,
 )
+
+// long: 页面共用的间距和圆角层级让相同用途的卡片、列表与表单保持一致，同时减少重复留白。
+object XmproSpacing {
+    val pageHorizontal = 16.dp
+    val compactPageHorizontal = 12.dp
+    val sectionSpacing = 10.dp
+    val componentSpacing = 8.dp
+    val compactSpacing = 4.dp
+    val cardSpacing = 6.dp
+    val cardContent = 12.dp
+    val compactCardContent = 8.dp
+    val listRowVertical = 4.dp
+    val compactRowVertical = 3.dp
+    val minimumTouchTarget = 48.dp
+    val bottomBarContentReserve = 88.dp
+    val playerBarContentReserve = 76.dp
+}
+
+object XmproShapes {
+    val card = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    val compactCard = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+}
 
 /** Mirrors AppAppearance.defaultSeedColor from the previous Flutter theme. */
 val DefaultSeedColor = Color(0xFFE57373)

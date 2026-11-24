@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import teikengstudio.xmpro.model.Comment
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 /**
  * Read-only comment list for the playing track.
@@ -72,7 +73,7 @@ fun CommentsSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            Modifier.fillMaxWidth().padding(horizontal = XmproSpacing.pageHorizontal),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -94,13 +95,13 @@ fun CommentsSheet(
             LinearProgressIndicator(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.sectionSpacing),
             )
         }
 
         if (error != null && comments.isEmpty()) {
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp),
+                Modifier.fillMaxWidth().padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.sectionSpacing),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(

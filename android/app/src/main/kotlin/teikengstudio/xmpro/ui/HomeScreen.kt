@@ -72,6 +72,8 @@ import teikengstudio.xmpro.model.HomeAlbumStats
 import teikengstudio.xmpro.model.HomeChannel
 import teikengstudio.xmpro.model.HomeSection
 import teikengstudio.xmpro.model.Track
+import teikengstudio.xmpro.ui.theme.XmproShapes
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 @Composable
 fun HomeScreen(
@@ -109,7 +111,7 @@ fun HomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+                        .padding(start = XmproSpacing.pageHorizontal, end = 12.dp, top = 6.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -131,7 +133,7 @@ fun HomeScreen(
                         onClick = onRefreshHome,
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -148,7 +150,7 @@ fun HomeScreen(
                     // the row simply scrolls, so the header stays symmetric.
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = XmproSpacing.pageHorizontal, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(
                             8.dp,
                             Alignment.CenterHorizontally,
@@ -185,7 +187,7 @@ fun HomeScreen(
                 }
                 if (!showingSearch && state.tabs.isNotEmpty()) {
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
+                        contentPadding = PaddingValues(horizontal = XmproSpacing.pageHorizontal, vertical = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         items(state.tabs, key = { it.tabId }) { tab ->
@@ -207,6 +209,7 @@ fun HomeScreen(
                             PillChip(
                                 selected = state.searchKind == kind,
                                 label = label,
+                                compact = true,
                                 onClick = { onSearch(state.query, kind) },
                             )
                         }
@@ -227,7 +230,7 @@ fun HomeScreen(
         if (error != null) {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
-                shape = RoundedCornerShape(14.dp),
+                shape = XmproShapes.compactCard,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -360,7 +363,7 @@ fun CapsuleSearchField(
     onSearch: (() -> Unit)? = null,
 ) {
     Surface(
-        modifier = modifier.height(42.dp),
+        modifier = modifier.height(XmproSpacing.minimumTouchTarget),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
@@ -411,7 +414,7 @@ fun CapsuleSearchField(
             if (value.isNotEmpty() && onClear != null) {
                 IconButton(
                     onClick = onClear,
-                    modifier = Modifier.size(30.dp),
+                    modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                 ) {
                     Icon(
                         Icons.Filled.Close,
@@ -533,7 +536,7 @@ private fun ChannelEditorSheet(
                     IconButton(
                         onClick = { onMove(channel.pageId, -1) },
                         enabled = index > 0,
-                        modifier = Modifier.size(34.dp),
+                        modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                     ) {
                         Icon(
                             Icons.Filled.KeyboardArrowUp,
@@ -544,7 +547,7 @@ private fun ChannelEditorSheet(
                     IconButton(
                         onClick = { onMove(channel.pageId, 1) },
                         enabled = index < visible.lastIndex,
-                        modifier = Modifier.size(34.dp),
+                        modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                     ) {
                         Icon(
                             Icons.Filled.KeyboardArrowDown,
@@ -555,7 +558,7 @@ private fun ChannelEditorSheet(
                     IconButton(
                         onClick = { onHide(channel.pageId) },
                         enabled = visible.size > 1,
-                        modifier = Modifier.size(34.dp),
+                        modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                     ) {
                         Icon(
                             Icons.Filled.Close,
@@ -597,11 +600,11 @@ private fun ChannelEditorSheet(
 
 @Composable
 private fun SectionBlock(section: HomeSection, onOpenAlbum: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = XmproSpacing.sectionSpacing)) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+                .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.compactSpacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -639,7 +642,7 @@ private fun SectionBlock(section: HomeSection, onOpenAlbum: (String) -> Unit) {
                 maxWidth >= 560.dp -> 2
                 else -> 1
             }
-            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = XmproSpacing.compactPageHorizontal)) {
                 for (row in section.albums.chunked(columns)) {
                     Row(Modifier.fillMaxWidth()) {
                         for (album in row) {
@@ -678,12 +681,12 @@ private fun AlbumCard(
     }
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = XmproShapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         onClick = onClick,
     ) {
         Row(
-            modifier = Modifier.padding(if (compact) 9.dp else 12.dp),
+            modifier = Modifier.padding(if (compact) XmproSpacing.compactCardContent else XmproSpacing.cardContent),
             verticalAlignment = Alignment.Top,
         ) {
             Box {
@@ -738,7 +741,7 @@ private fun AlbumCard(
             ) {
                 Text(
                     album.title,
-                    style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -746,7 +749,7 @@ private fun AlbumCard(
                 if (album.artist.isNotEmpty()) {
                     Text(
                         album.artist,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -832,14 +835,14 @@ fun Cover(url: String?, size: Int) {
 fun TrackRow(track: Track, onPlay: () -> Unit) {
     Surface(
         onClick = onPlay,
-        shape = RoundedCornerShape(14.dp),
+        shape = XmproShapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
+            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.compactRowVertical),
     ) {
         Row(
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier.padding(XmproSpacing.compactCardContent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Cover(track.coverUrl, 44)
@@ -869,7 +872,7 @@ fun TrackRow(track: Track, onPlay: () -> Unit) {
             }
             FilledTonalIconButton(
                 onClick = onPlay,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
             ) {
                 Icon(
                     Icons.Filled.PlayArrow,

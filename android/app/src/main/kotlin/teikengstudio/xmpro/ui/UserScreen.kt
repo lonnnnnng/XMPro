@@ -37,6 +37,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import teikengstudio.xmpro.model.Album
+import teikengstudio.xmpro.ui.theme.XmproShapes
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 /** Anchor homepage: counters, intro and the albums that anchor published. */
 @Composable
@@ -85,7 +87,7 @@ fun UserScreen(
         state.userError?.let {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
-                shape = RoundedCornerShape(14.dp),
+                shape = XmproShapes.compactCard,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -106,17 +108,17 @@ fun UserScreen(
             ) {
                 item(key = "user-hero") {
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
+                        shape = XmproShapes.card,
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.compactRowVertical),
                     ) {
-                        Column(Modifier.padding(16.dp)) {
+                        Column(Modifier.padding(XmproSpacing.cardContent)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     Modifier
-                                        .size(72.dp)
+                                        .size(64.dp)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                                     contentAlignment = Alignment.Center,
@@ -136,7 +138,7 @@ fun UserScreen(
                                         )
                                     }
                                 }
-                                Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                                Column(Modifier.weight(1f).padding(start = XmproSpacing.componentSpacing)) {
                                     Text(
                                         page.nickname.ifEmpty { "主播 ${page.uid}" },
                                         style = MaterialTheme.typography.titleMedium,
@@ -155,10 +157,10 @@ fun UserScreen(
                             Row(
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 14.dp)
-                                    .clip(RoundedCornerShape(14.dp))
+                                    .padding(top = XmproSpacing.componentSpacing)
+                                    .clip(XmproShapes.compactCard)
                                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                    .padding(vertical = 10.dp),
+                                    .padding(vertical = XmproSpacing.componentSpacing),
                             ) {
                                 UserStat(formatCount(page.following), "关注", Modifier.weight(1f))
                                 UserStat(formatCount(page.followers), "粉丝", Modifier.weight(1f))
@@ -171,7 +173,7 @@ fun UserScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 3,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(top = 12.dp),
+                                    modifier = Modifier.padding(top = XmproSpacing.componentSpacing),
                                 )
                             }
                         }
@@ -181,7 +183,7 @@ fun UserScreen(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.componentSpacing),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
@@ -230,15 +232,15 @@ fun UserScreen(
 private fun UserAlbumRow(album: Album, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = XmproShapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.listRowVertical),
     ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Cover(album.coverUrl, 60)
-            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+        Row(Modifier.padding(XmproSpacing.compactCardContent), verticalAlignment = Alignment.CenterVertically) {
+            Cover(album.coverUrl, 44)
+            Column(Modifier.weight(1f).padding(horizontal = XmproSpacing.componentSpacing)) {
                 Text(
                     album.title,
                     style = MaterialTheme.typography.bodyMedium,

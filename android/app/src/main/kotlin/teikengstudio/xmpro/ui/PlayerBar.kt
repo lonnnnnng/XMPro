@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 /**
  * Floating player card shown above the navigation pill while a track is loaded.
@@ -120,7 +121,7 @@ fun PlayerBar(
                     }
                     FilledTonalIconButton(
                         onClick = onToggle,
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                     ) {
                         Icon(
                             if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -128,7 +129,7 @@ fun PlayerBar(
                             modifier = Modifier.size(20.dp),
                         )
                     }
-                    IconButton(onClick = onStop, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = onStop, modifier = Modifier.size(XmproSpacing.minimumTouchTarget)) {
                         Icon(
                             Icons.Filled.Close,
                             contentDescription = "停止",

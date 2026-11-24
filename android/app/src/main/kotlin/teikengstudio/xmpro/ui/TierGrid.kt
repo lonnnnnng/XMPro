@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import teikengstudio.xmpro.ui.theme.XmproShapes
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 /** One fixed-size slice of an episode list. */
 data class Tier(val from: Int, val to: Int) {
@@ -69,13 +72,13 @@ fun TierGrid(
                     Surface(
                         onClick = { onPick(tier) },
                         enabled = enabled,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = XmproShapes.compactCard,
                         color = if (active) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
                             MaterialTheme.colorScheme.surfaceContainerHigh
                         },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).heightIn(min = XmproSpacing.minimumTouchTarget),
                     ) {
                         Text(
                             tier.label,
@@ -90,7 +93,7 @@ fun TierGrid(
                             maxLines = 1,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 11.dp),
+                                .padding(vertical = XmproSpacing.componentSpacing),
                         )
                     }
                 }

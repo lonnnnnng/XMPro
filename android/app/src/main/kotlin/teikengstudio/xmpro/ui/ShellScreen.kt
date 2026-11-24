@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import teikengstudio.xmpro.data.AppContainer
 import teikengstudio.xmpro.ui.theme.ThemedContent
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 private enum class Destination { Home, Listening, Settings }
 
@@ -87,7 +88,8 @@ fun ShellScreen(
     val albumOpen = state.album != null || state.albumLoading || state.albumError != null
     val userOpen = state.userPage != null || state.userLoading || state.userError != null
     // The content scrolls under the floating bars, so it needs matching bottom room.
-    val contentBottom = navBottom + 88.dp + if (playerVisible) 76.dp else 0.dp
+    val contentBottom = navBottom + XmproSpacing.bottomBarContentReserve +
+        if (playerVisible) XmproSpacing.playerBarContentReserve else 0.dp
 
     // PiliPlus style: bars retract while the user reads down a list and return
     // on the first upward drag (or when playback starts / a page changes).

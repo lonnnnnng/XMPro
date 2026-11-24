@@ -63,6 +63,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import teikengstudio.xmpro.model.Track
+import teikengstudio.xmpro.ui.theme.XmproShapes
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -119,7 +121,7 @@ fun AlbumScreen(
             LinearProgressIndicator(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = XmproSpacing.pageHorizontal)
                     .height(2.dp)
                     .clip(CircleShape),
             )
@@ -127,7 +129,7 @@ fun AlbumScreen(
         state.albumError?.let {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
-                shape = RoundedCornerShape(14.dp),
+                shape = XmproShapes.compactCard,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -148,22 +150,22 @@ fun AlbumScreen(
             ) {
                 item(key = "album-hero") {
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
+                        shape = XmproShapes.card,
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.compactRowVertical),
                     ) {
-                        Column(Modifier.padding(16.dp)) {
+                        Column(Modifier.padding(XmproSpacing.cardContent)) {
                             Row(verticalAlignment = Alignment.Top) {
                                 Cover(
                                     url = album.coverUrl ?: page.tracks.firstOrNull()?.coverUrl,
-                                    size = 96,
+                                    size = 88,
                                 )
                                 Column(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .padding(start = 14.dp),
+                                        .padding(start = XmproSpacing.componentSpacing),
                                 ) {
                                     Text(
                                         album.title,
@@ -303,7 +305,7 @@ fun AlbumScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                        .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.componentSpacing),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
@@ -364,7 +366,7 @@ fun AlbumScreen(
                     val order = track.orderNo ?: (page.tracks.indexOf(track) + 1)
                     Surface(
                         onClick = { onPlay(track) },
-                        shape = RoundedCornerShape(14.dp),
+                        shape = XmproShapes.card,
                         color = if (active) {
                             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
                         } else {
@@ -372,10 +374,10 @@ fun AlbumScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.listRowVertical),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = XmproSpacing.compactCardContent, vertical = XmproSpacing.compactCardContent),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
@@ -428,7 +430,7 @@ fun AlbumScreen(
                             IconButton(
                                 onClick = { if (!queued) onDownload(listOf(track)) },
                                 enabled = !queued,
-                                modifier = Modifier.size(34.dp),
+                                modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                             ) {
                                 Icon(
                                     if (saved) Icons.Filled.DownloadDone else Icons.Filled.FileDownload,
@@ -444,7 +446,7 @@ fun AlbumScreen(
                             Spacer(Modifier.width(4.dp))
                             FilledTonalIconButton(
                                 onClick = { onPlay(track) },
-                                modifier = Modifier.size(34.dp),
+                                modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                             ) {
                                 Icon(
                                     Icons.Filled.PlayArrow,

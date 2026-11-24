@@ -71,6 +71,8 @@ import teikengstudio.xmpro.model.HistoryRecord
 import teikengstudio.xmpro.model.SubscriptionItem
 import teikengstudio.xmpro.model.Track
 import teikengstudio.xmpro.model.UpdateItem
+import teikengstudio.xmpro.ui.theme.XmproShapes
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 /** Chip keys in the order the user chose; see [ListeningTabs]. */
 private fun orderedTabs(order: List<String>): List<String> = ListeningTabs.normalize(order)
@@ -118,7 +120,7 @@ fun ListeningScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 12.dp, top = 6.dp, bottom = 2.dp),
+                    .padding(start = XmproSpacing.pageHorizontal, end = 12.dp, top = 6.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -133,7 +135,7 @@ fun ListeningScreen(
                     onClick = onRefresh,
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
@@ -146,13 +148,14 @@ fun ListeningScreen(
                 }
             }
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = XmproSpacing.pageHorizontal, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(tabs.size) { index ->
                     PillChip(
                         selected = pagerState.currentPage == index,
                         label = ListeningTabs.label(tabs[index]),
+                        compact = true,
                         onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
                         onLongClick = { editingOrder = true },
                     )
@@ -173,7 +176,7 @@ fun ListeningScreen(
         state.listeningError?.let {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
-                shape = RoundedCornerShape(14.dp),
+                shape = XmproShapes.compactCard,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -189,7 +192,7 @@ fun ListeningScreen(
         if (!state.signedIn) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = XmproShapes.card,
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     modifier = Modifier.padding(horizontal = 32.dp),
                 ) {
@@ -328,7 +331,7 @@ private fun ListeningTabsSheet(
                     IconButton(
                         onClick = { onMove(index, -1) },
                         enabled = index > 0,
-                        modifier = Modifier.size(34.dp),
+                        modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                     ) {
                         Icon(
                             Icons.Filled.KeyboardArrowUp,
@@ -339,7 +342,7 @@ private fun ListeningTabsSheet(
                     IconButton(
                         onClick = { onMove(index, 1) },
                         enabled = index < order.lastIndex,
-                        modifier = Modifier.size(34.dp),
+                        modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                     ) {
                         Icon(
                             Icons.Filled.KeyboardArrowDown,
@@ -375,7 +378,7 @@ private fun UpdatesTab(
         if (state.subscriptions.isNotEmpty()) {
             item {
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = XmproShapes.card,
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -654,7 +657,7 @@ private fun BookmarksTab(
         items(rows, key = { it.track.id }) { bookmark ->
             Surface(
                 onClick = { onPlay(bookmark.track, bookmark.positionMs) },
-                shape = RoundedCornerShape(16.dp),
+                shape = XmproShapes.card,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -709,7 +712,7 @@ private fun BookmarksTab(
                     }
                     IconButton(
                         onClick = { onRemoveBookmark(bookmark.track.id) },
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                     ) {
                         Icon(
                             Icons.Filled.DeleteOutline,
@@ -720,7 +723,7 @@ private fun BookmarksTab(
                     }
                     FilledTonalIconButton(
                         onClick = { onPlay(bookmark.track, bookmark.positionMs) },
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                     ) {
                         Icon(
                             Icons.Filled.PlayArrow,
@@ -822,21 +825,21 @@ private fun TrackLine(
         onClick = {
             if (track.albumKey.isNotEmpty()) onOpenAlbum(track.albumKey) else onPlay()
         },
-        shape = RoundedCornerShape(16.dp),
+        shape = XmproShapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
+            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.compactRowVertical),
     ) {
         Row(
-            modifier = Modifier.padding(9.dp),
+            modifier = Modifier.padding(XmproSpacing.compactCardContent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Cover(track.coverUrl, 46)
+            Cover(track.coverUrl, 44)
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 10.dp),
+                    .padding(horizontal = XmproSpacing.componentSpacing),
             ) {
                 Text(
                     track.title.ifEmpty { track.number },
@@ -863,7 +866,7 @@ private fun TrackLine(
             if (onRemove != null) {
                 IconButton(
                     onClick = onRemove,
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                 ) {
                     Icon(
                         Icons.Filled.Favorite,
@@ -875,7 +878,7 @@ private fun TrackLine(
             }
             FilledTonalIconButton(
                 onClick = onPlay,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
             ) {
                 Icon(
                     Icons.Filled.PlayArrow,
@@ -896,26 +899,26 @@ private fun SubscriptionLine(
 ) {
     Surface(
         onClick = { onOpenAlbum(item.album.id) },
-        shape = RoundedCornerShape(16.dp),
+        shape = XmproShapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
+            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.compactRowVertical),
     ) {
         Row(
-            modifier = Modifier.padding(9.dp),
+            modifier = Modifier.padding(XmproSpacing.compactCardContent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Cover(item.album.coverUrl, 48)
+            Cover(item.album.coverUrl, 44)
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 10.dp),
+                    .padding(horizontal = XmproSpacing.componentSpacing),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         item.album.title,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -929,7 +932,7 @@ private fun SubscriptionLine(
                     item.latestTitle.ifEmpty {
                         if (total > 0) "\u5171 $total \u96c6" else item.album.artist
                     },
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -964,16 +967,16 @@ private fun HistoryLine(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
+            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.compactRowVertical),
     ) {
     Surface(
         onClick = if (editing) onToggle else onPlay,
-        shape = RoundedCornerShape(16.dp),
+        shape = XmproShapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(9.dp),
+            modifier = Modifier.padding(XmproSpacing.compactCardContent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (editing) {
@@ -989,11 +992,11 @@ private fun HistoryLine(
                 )
                 Spacer(Modifier.width(10.dp))
             }
-            Cover(record.track.coverUrl, 46)
+            Cover(record.track.coverUrl, 44)
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 10.dp),
+                    .padding(horizontal = XmproSpacing.componentSpacing),
             ) {
                 Text(
                     record.track.title.ifEmpty { record.track.number },
@@ -1030,7 +1033,7 @@ private fun HistoryLine(
             if (!editing) {
                 FilledTonalIconButton(
                     onClick = onPlay,
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(XmproSpacing.minimumTouchTarget),
                 ) {
                     Icon(
                         Icons.Filled.PlayArrow,

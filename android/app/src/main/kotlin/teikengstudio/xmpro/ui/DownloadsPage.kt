@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import teikengstudio.xmpro.download.DownloadState
 import teikengstudio.xmpro.download.DownloadTask
 import teikengstudio.xmpro.model.Track
+import teikengstudio.xmpro.ui.theme.XmproShapes
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 /**
  * Offline library: what is downloading, what is paused, what can be played with
@@ -70,7 +72,7 @@ fun DownloadsPage(
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 18.dp, end = 12.dp, top = 4.dp, bottom = 2.dp),
+            Modifier.fillMaxWidth().padding(start = XmproSpacing.pageHorizontal, end = XmproSpacing.pageHorizontal, top = 4.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -100,7 +102,7 @@ fun DownloadsPage(
                 progress = { settled.toFloat() / tasks.size },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 2.dp)
+                    .padding(horizontal = XmproSpacing.pageHorizontal, vertical = 2.dp)
                     .height(3.dp)
                     .clip(CircleShape),
             )
@@ -168,16 +170,16 @@ private fun DownloadRow(
 ) {
     Surface(
         onClick = { if (task.state == DownloadState.DONE) onPlay() },
-        shape = RoundedCornerShape(16.dp),
+        shape = XmproShapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.listRowVertical),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(XmproSpacing.compactCardContent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Cover(task.track.coverUrl, 52)
-            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            Cover(task.track.coverUrl, 44)
+            Column(Modifier.weight(1f).padding(horizontal = XmproSpacing.componentSpacing)) {
                 Text(
                     task.track.title.ifEmpty { task.track.number },
                     style = MaterialTheme.typography.bodyMedium,
@@ -204,7 +206,7 @@ private fun DownloadRow(
                     },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 3.dp),
+                    modifier = Modifier.padding(top = XmproSpacing.compactSpacing),
                 )
                 if (task.state == DownloadState.RUNNING || task.state == DownloadState.PAUSED) {
                     LinearProgressIndicator(
@@ -218,7 +220,7 @@ private fun DownloadRow(
                 }
             }
             when (task.state) {
-                DownloadState.DONE -> IconButton(onClick = onPlay, modifier = Modifier.size(36.dp)) {
+                DownloadState.DONE -> IconButton(onClick = onPlay, modifier = Modifier.size(XmproSpacing.minimumTouchTarget)) {
                     Icon(
                         Icons.Filled.PlayArrow,
                         contentDescription = "播放离线音频",
@@ -226,7 +228,7 @@ private fun DownloadRow(
                     )
                 }
 
-                DownloadState.RUNNING -> IconButton(onClick = onPause, modifier = Modifier.size(36.dp)) {
+                DownloadState.RUNNING -> IconButton(onClick = onPause, modifier = Modifier.size(XmproSpacing.minimumTouchTarget)) {
                     Icon(
                         Icons.Filled.Pause,
                         contentDescription = "暂停下载",
@@ -234,7 +236,7 @@ private fun DownloadRow(
                     )
                 }
 
-                else -> IconButton(onClick = onResume, modifier = Modifier.size(36.dp)) {
+                else -> IconButton(onClick = onResume, modifier = Modifier.size(XmproSpacing.minimumTouchTarget)) {
                     Icon(
                         Icons.Filled.Refresh,
                         contentDescription = if (task.state == DownloadState.FAILED) "重试" else "继续下载",
@@ -242,7 +244,7 @@ private fun DownloadRow(
                     )
                 }
             }
-            IconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
+            IconButton(onClick = onRemove, modifier = Modifier.size(XmproSpacing.minimumTouchTarget)) {
                 Icon(
                     Icons.Filled.DeleteOutline,
                     contentDescription = "删除下载",

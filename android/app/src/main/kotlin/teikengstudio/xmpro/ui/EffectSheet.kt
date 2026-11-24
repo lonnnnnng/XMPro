@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import teikengstudio.xmpro.player.EffectPreset
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 
 /**
  * Sound preset picker for the player sheet.
@@ -46,7 +47,7 @@ fun EffectSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
-        Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp)) {
+        Column(Modifier.navigationBarsPadding().padding(horizontal = XmproSpacing.pageHorizontal)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "音效",
@@ -62,7 +63,7 @@ fun EffectSheet(
                 )
             }
             FlowRow(
-                Modifier.fillMaxWidth().padding(top = 14.dp),
+                Modifier.fillMaxWidth().padding(top = XmproSpacing.sectionSpacing),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {

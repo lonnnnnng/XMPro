@@ -79,6 +79,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import teikengstudio.xmpro.ui.theme.XmproShapes
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 import kotlin.math.roundToInt
 import teikengstudio.xmpro.model.Track
 import teikengstudio.xmpro.ui.theme.ThemedContent
@@ -166,7 +168,7 @@ fun PlayerSheet(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = XmproSpacing.pageHorizontal),
         ) {
             Row(
                 Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -223,7 +225,7 @@ fun PlayerSheet(
                 track?.title ?: "尚未选择声音",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp),
+                    .padding(top = XmproSpacing.sectionSpacing),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -235,7 +237,7 @@ fun PlayerSheet(
                     .joinToString(" · "),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 6.dp)
+                    .padding(top = XmproSpacing.compactSpacing)
                     .then(
                         if (track?.albumKey?.isNotEmpty() == true) {
                             Modifier.clickable { onOpenAlbum(track.albumKey) }
@@ -267,7 +269,7 @@ fun PlayerSheet(
                 enabled = total > 0,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = XmproSpacing.componentSpacing),
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                 Text(
@@ -318,7 +320,7 @@ fun PlayerSheet(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(XmproShapes.compactCard)
                     .clickable { effectOpen = true }
                     .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -461,7 +463,7 @@ fun PlayerSheet(
                 )
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(XmproSpacing.sectionSpacing))
             Surface(
                 onClick = { queueOpen = true },
                 shape = CircleShape,
@@ -469,7 +471,7 @@ fun PlayerSheet(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
-                    Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                    Modifier.padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.componentSpacing),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -500,7 +502,7 @@ fun PlayerSheet(
         var rangeOpen by remember { mutableStateOf(false) }
         ModalBottomSheet(onDismissRequest = { queueOpen = false }, sheetState = sheetState) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                Modifier.fillMaxWidth().padding(horizontal = XmproSpacing.pageHorizontal),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -534,7 +536,7 @@ fun PlayerSheet(
                     Modifier
                         .heightIn(max = 300.dp)
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                        .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.componentSpacing),
                 ) {
                     TierGrid(
                         total = full.size,
@@ -562,7 +564,7 @@ fun PlayerSheet(
                             onSelectQueue(index)
                             queueOpen = false
                         },
-                        shape = RoundedCornerShape(14.dp),
+                        shape = XmproShapes.card,
                         color = if (active) {
                             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                         } else {
@@ -573,17 +575,17 @@ fun PlayerSheet(
                         contentColor = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 3.dp),
+                            .padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.compactRowVertical),
                     ) {
                         Row(
-                            Modifier.padding(10.dp),
+                            Modifier.padding(XmproSpacing.compactCardContent),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Cover(item.coverUrl, 42)
+                            Cover(item.coverUrl, 44)
                             Column(
                                 Modifier
                                     .weight(1f)
-                                    .padding(horizontal = 10.dp),
+                                    .padding(horizontal = XmproSpacing.componentSpacing),
                             ) {
                                 Text(
                                     item.title.ifEmpty { item.number },
@@ -849,7 +851,7 @@ private fun DownloadQualitySheet(onPick: (String?) -> Unit, onDismiss: () -> Uni
                 androidx.compose.material3.Surface(
                     onClick = { onPick(quality) },
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = XmproShapes.compactCard,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -917,7 +919,7 @@ private fun PlayerActionIcon(
 fun QueueRow(track: Track, active: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
+        shape = XmproShapes.compactCard,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 3.dp),
     ) {

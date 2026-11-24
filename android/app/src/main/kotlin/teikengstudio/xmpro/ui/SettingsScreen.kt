@@ -12,6 +12,8 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import teikengstudio.xmpro.R
+import teikengstudio.xmpro.ui.theme.XmproShapes
+import teikengstudio.xmpro.ui.theme.XmproSpacing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -591,13 +593,13 @@ private fun SettingsRoot(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = XmproSpacing.pageHorizontal),
     ) {
         Text(
             "我的",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 6.dp),
+            modifier = Modifier.padding(top = XmproSpacing.componentSpacing, bottom = XmproSpacing.compactSpacing),
         )
         SettingsGroup {
             ProfileHeader(
@@ -681,7 +683,7 @@ private fun ProfileHeader(
     onOpenSocial: (String) -> Unit,
 ) {
     var switchOpen by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(XmproSpacing.compactCardContent)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
@@ -764,30 +766,30 @@ private fun ProfileHeader(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = 10.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .padding(top = XmproSpacing.componentSpacing)
+                .clip(XmproShapes.compactCard)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(vertical = 2.dp),
         ) {
             Stat(
                 account?.following?.toString() ?: "—",
                 "关注",
-                Modifier.weight(1f).clickable { onOpenSocial("following") },
+                Modifier.weight(1f).heightIn(min = XmproSpacing.minimumTouchTarget).clickable { onOpenSocial("following") },
             )
             Stat(
                 account?.followers?.toString() ?: "—",
                 "粉丝",
-                Modifier.weight(1f).clickable { onOpenSocial("fans") },
+                Modifier.weight(1f).heightIn(min = XmproSpacing.minimumTouchTarget).clickable { onOpenSocial("fans") },
             )
             Stat(
                 account?.subscriptionCount?.toString() ?: "${state.subscriptions.size}",
                 "订阅",
-                Modifier.weight(1f).clickable { onOpenSocial("subscriptions") },
+                Modifier.weight(1f).heightIn(min = XmproSpacing.minimumTouchTarget).clickable { onOpenSocial("subscriptions") },
             )
             Stat(
                 "${state.favorites.size}",
                 "收藏",
-                Modifier.weight(1f).clickable { onOpenSocial("favorites") },
+                Modifier.weight(1f).heightIn(min = XmproSpacing.minimumTouchTarget).clickable { onOpenSocial("favorites") },
             )
         }
 
@@ -1090,11 +1092,11 @@ private fun <T> ChoiceRow(
 @Composable
 private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = XmproShapes.card,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = XmproSpacing.cardSpacing),
     ) {
         Column { content() }
     }
@@ -1103,7 +1105,7 @@ private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun GroupDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp),
+        modifier = Modifier.padding(horizontal = XmproSpacing.pageHorizontal),
         thickness = 0.6.dp,
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
     )
@@ -1116,7 +1118,7 @@ private fun GroupTitle(text: String) {
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 2.dp),
+        modifier = Modifier.padding(start = XmproSpacing.pageHorizontal, top = XmproSpacing.sectionSpacing, bottom = 2.dp),
     )
 }
 
@@ -1132,8 +1134,12 @@ private fun SettingsRow(
     Row(
         Modifier
             .fillMaxWidth()
+            .heightIn(min = XmproSpacing.minimumTouchTarget)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 14.dp),
+            .padding(
+                horizontal = XmproSpacing.pageHorizontal,
+                vertical = if (compact) XmproSpacing.compactSpacing else XmproSpacing.componentSpacing,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -1157,15 +1163,15 @@ private fun SettingsRow(
         ) {
             Text(
                 title,
-                style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyMedium,
             )
             Text(
                 subtitle,
-                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = if (compact) 1.dp else 2.dp),
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
         Icon(
@@ -1178,8 +1184,8 @@ private fun SettingsRow(
 
 @Composable
 private fun InfoRow(title: String, subtitle: String) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyLarge)
+    Column(Modifier.fillMaxWidth().padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.componentSpacing)) {
+        Text(title, style = MaterialTheme.typography.bodyMedium)
         Text(
             subtitle,
             style = MaterialTheme.typography.bodySmall,
@@ -1192,13 +1198,20 @@ private fun InfoRow(title: String, subtitle: String) {
 @Composable
 private fun PageHeader(title: String, onBack: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 6.dp, top = 6.dp, end = 16.dp, bottom = 2.dp),
+        Modifier.fillMaxWidth().padding(start = 6.dp, top = 6.dp, end = XmproSpacing.pageHorizontal, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
         }
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -1726,7 +1739,7 @@ private fun RenameDialog(
                 onValueChange = { text = it.take(24) },
                 label = { Text("显示名称") },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp),
+                shape = XmproShapes.compactCard,
                 modifier = Modifier.fillMaxWidth(),
             )
         },
@@ -1750,7 +1763,7 @@ private fun CookieDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
                 label = { Text("Cookie 或登录信息 JSON") },
                 minLines = 4,
                 maxLines = 8,
-                shape = RoundedCornerShape(14.dp),
+                shape = XmproShapes.compactCard,
                 modifier = Modifier.fillMaxWidth(),
             )
         },
@@ -1820,7 +1833,7 @@ private fun SmsLoginDialog(
                     label = { Text("手机号") },
                     singleLine = true,
                     enabled = !busy && challenge == null,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = XmproShapes.compactCard,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 )
@@ -1839,7 +1852,7 @@ private fun SmsLoginDialog(
                         label = { Text("短信验证码") },
                         singleLine = true,
                         enabled = !busy,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = XmproShapes.compactCard,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {
                             if (!busy && code.length >= 4) verify()
