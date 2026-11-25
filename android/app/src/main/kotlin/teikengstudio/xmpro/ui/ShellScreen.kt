@@ -49,8 +49,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import teikengstudio.xmpro.XmproApp
 import teikengstudio.xmpro.data.AppContainer
 import teikengstudio.xmpro.ui.theme.ThemedContent
 import teikengstudio.xmpro.ui.theme.XmproSpacing
@@ -72,7 +74,22 @@ fun ShellScreen(
     onAppearanceChange: (dynamic: Boolean, seed: Int) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
-    val viewModel: MainViewModel = viewModel { MainViewModel(context, container) }
+    val app = context.applicationContext as XmproApp
+    val viewModel: MainViewModel = remember(app, container) {
+        ViewModelProvider(
+            app,
+            object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    require(modelClass.isAssignableFrom(MainViewModel::class.java)) {
+                        "Unsupported app ViewModel: ${modelClass.name}"
+                    }
+                    // long: 仅传入 Application Context，避免应用级 ViewModel 因播放服务存活而泄漏 Activity。
+                    @Suppress("UNCHECKED_CAST")
+                    return MainViewModel(app, container) as T
+                }
+            },
+        ).get(MainViewModel::class.java)
+    }
     val state by viewModel.state.collectAsStateWithLifecycle()
     var selectedIndex by rememberSaveable { mutableStateOf(0) }
     var playerOpen by rememberSaveable { mutableStateOf(false) }
