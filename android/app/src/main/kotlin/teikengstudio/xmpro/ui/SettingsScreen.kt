@@ -1390,8 +1390,12 @@ private fun LoginEntry(onAddCookie: () -> Unit, onAddSms: () -> Unit) {
 
 @Composable
 private fun Stat(value: String, label: String, modifier: Modifier = Modifier) {
-    // long: 统计数字降低一档以减轻顶部视觉重量，同时保留至少 48dp 点击高度。
-    Column(modifier.heightIn(min = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    // long: 数字和标签在统一的最小点击高度内垂直居中，避免整组统计内容贴近卡片上沿。
+    Column(
+        modifier.heightIn(min = XmproSpacing.minimumTouchTarget),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
         Text(
             value,
             style = MaterialTheme.typography.titleSmall,
