@@ -2,20 +2,14 @@ package teikengstudio.xmpro.player
 
 import android.app.PendingIntent
 import android.content.Intent
-import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import androidx.media3.session.SessionCommand
-import androidx.media3.session.SessionResult
-import com.google.common.util.concurrent.Futures
-import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -35,100 +29,6 @@ class PlaybackService : MediaSessionService() {
     private val effects = AudioEffects()
     private val effectScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var audioSessionId = 0
-
-    private val nextCommand = SessionCommand(ACTION_NEXT, Bundle.EMPTY)
-    private val previousCommand = SessionCommand(ACTION_PREVIOUS, Bundle.EMPTY)
-
-    private val callback = object : MediaSession.Callback {
-        /**
-         * Adds episode skipping to the notification layout.
-         *
-         * The player holds one item at a time, so its own next/previous are not
-         * available and the default layout would only offer play/pause.
-         */
-        override fun onConnect(
-            session: MediaSession,
-            controller: MediaSession.ControllerInfo,
-        ): MediaSession.ConnectionResult =
-            MediaSession.ConnectionResult.AcceptedResultBuilder(session)
-                .setAvailableSessionCommands(
-                    MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
-                        .add(previousCommand)
-                        .add(nextCommand)
-                        .build(),
-                )
-                .setAvailablePlayerCommands(
-                    MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
-                        .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
-                        .add(Player.COMMAND_SEEK_TO_NEXT)
-                        .add(Player.COMMAND_SEEK_TO_PREVIOUS)
-                        .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
-                        .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
-                        .build(),
-                )
-                .setCustomLayout(
-                    listOf(
-                        CommandButton.Builder()
-                            .setDisplayName("上一集")
-                            .setIconResId(android.R.drawable.ic_media_previous)
-                            .setSessionCommand(previousCommand)
-                            .build(),
-                        CommandButton.Builder()
-                            .setDisplayName("下一集")
-                            .setIconResId(android.R.drawable.ic_media_next)
-                            .setSessionCommand(nextCommand)
-                            .build(),
-                    ),
-                )
-                .build()
-
-        override fun onCustomCommand(
-            session: MediaSession,
-            controller: MediaSession.ControllerInfo,
-            customCommand: SessionCommand,
-            args: Bundle,
-        ): ListenableFuture<SessionResult> {
-            when (customCommand.customAction) {
-                ACTION_NEXT -> {
-                    PlaybackQueueBridge.request(PlaybackQueueBridge.Command.Next)
-                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
-                }
-
-                ACTION_PREVIOUS -> {
-                    PlaybackQueueBridge.request(PlaybackQueueBridge.Command.Previous)
-                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
-                }
-            }
-            return super.onCustomCommand(session, controller, customCommand, args)
-        }
-
-        /**
-         * Routes track skipping from Bluetooth, headsets and Android Auto to the
-         * queue owner. Forwarding these to the player would do nothing, since the
-         * player never holds more than one item.
-         */
-        override fun onPlayerCommandRequest(
-            session: MediaSession,
-            controller: MediaSession.ControllerInfo,
-            playerCommand: Int,
-        ): Int = when (playerCommand) {
-            Player.COMMAND_SEEK_TO_NEXT,
-            Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
-            -> {
-                PlaybackQueueBridge.request(PlaybackQueueBridge.Command.Next)
-                SessionResult.RESULT_SUCCESS
-            }
-
-            Player.COMMAND_SEEK_TO_PREVIOUS,
-            Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
-            -> {
-                PlaybackQueueBridge.request(PlaybackQueueBridge.Command.Previous)
-                SessionResult.RESULT_SUCCESS
-            }
-
-            else -> super.onPlayerCommandRequest(session, controller, playerCommand)
-        }
-    }
 
     override fun onCreate() {
         super.onCreate()
@@ -234,8 +134,8 @@ class PlaybackService : MediaSessionService() {
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        session = MediaSession.Builder(this, exo)
-            .setCallback(callback)
+        // long: 向系统提供标准切集能力，由系统统一生成上一集、播放/暂停、下一集三个按钮。
+        session = MediaSession.Builder(this, EpisodeQueuePlayer(exo))
             // long: 系统媒体卡片需要明确的 Activity 入口，点击卡片才能返回正在播放的应用。
             .setSessionActivity(sessionActivity)
             // The default loader already fetches https artwork, which is what the
@@ -276,11 +176,6 @@ class PlaybackService : MediaSessionService() {
         player?.release()
         player = null
         super.onDestroy()
-    }
-
-    private companion object {
-        const val ACTION_NEXT = "teikengstudio.xmpro.action.NEXT"
-        const val ACTION_PREVIOUS = "teikengstudio.xmpro.action.PREVIOUS"
     }
 }
 

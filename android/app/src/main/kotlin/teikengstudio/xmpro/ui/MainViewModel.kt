@@ -1160,10 +1160,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
 
     fun previous() {
         val current = _state.value
-        if (playback.currentPosition() > 5000) {
-            playback.seekTo(0)
-            return
-        }
+        // long: 上一集始终切换剧集，避免锁屏播放较久后点击却只回到本集开头。
         val index = current.queueIndex - 1
         if (index < 0) {
             playback.seekTo(0)
