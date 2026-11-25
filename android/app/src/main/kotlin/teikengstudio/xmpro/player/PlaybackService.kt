@@ -153,6 +153,67 @@ class PlaybackService : MediaSessionService() {
                 setWakeMode(C.WAKE_MODE_NETWORK)
                 setHandleAudioBecomingNoisy(true)
             }
+        var lastSnapshot: String? = null
+        exo.addListener(object : Player.Listener {
+            private fun recordSnapshot() {
+                val snapshot = listOf(
+                    exo.playbackState,
+                    exo.playWhenReady,
+                    exo.isPlaying,
+                    exo.playbackSuppressionReason,
+                ).joinToString(":")
+                if (snapshot == lastSnapshot) return
+                lastSnapshot = snapshot
+                PlaybackDiagnostics.record(
+                    this@PlaybackService,
+                    "service_player_state",
+                    "state" to PlaybackDiagnostics.playerState(exo.playbackState),
+                    "play_when_ready" to exo.playWhenReady,
+                    "is_playing" to exo.isPlaying,
+                    "suppression" to exo.playbackSuppressionReason,
+                    "position_ms" to exo.currentPosition.coerceAtLeast(0),
+                    "buffered_ms" to exo.bufferedPosition.coerceAtLeast(0),
+                )
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) = recordSnapshot()
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                PlaybackDiagnostics.record(
+                    this@PlaybackService,
+                    "service_play_when_ready_changed",
+                    "play_when_ready" to playWhenReady,
+                    "reason" to reason,
+                )
+                recordSnapshot()
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) = recordSnapshot()
+
+            override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) = recordSnapshot()
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                PlaybackDiagnostics.record(
+                    this@PlaybackService,
+                    "service_media_item_transition",
+                    "has_media_item" to (mediaItem != null),
+                    "reason" to reason,
+                )
+                recordSnapshot()
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                PlaybackDiagnostics.record(
+                    this@PlaybackService,
+                    "service_player_error",
+                    "error_code" to error.errorCode,
+                    "error_name" to error.errorCodeName,
+                    "cause_types" to PlaybackDiagnostics.causeTypes(error),
+                    "http_status" to PlaybackDiagnostics.httpStatus(error),
+                )
+            }
+        })
+        PlaybackDiagnostics.record(this, "service_created")
         // The session id only exists once an audio renderer is attached, and it
         // changes when the output device does; both cases re-apply the preset.
         exo.addAnalyticsListener(object : AnalyticsListener {
@@ -186,10 +247,25 @@ class PlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: android.content.Intent?) {
         val exo = player ?: return
+        PlaybackDiagnostics.record(
+            this,
+            "service_task_removed",
+            "play_when_ready" to exo.playWhenReady,
+            "item_count" to exo.mediaItemCount,
+        )
         if (!exo.playWhenReady || exo.mediaItemCount == 0) stopSelf()
     }
 
     override fun onDestroy() {
+        val exo = player
+        PlaybackDiagnostics.record(
+            this,
+            "service_destroyed",
+            "state" to exo?.let { PlaybackDiagnostics.playerState(it.playbackState) },
+            "play_when_ready" to exo?.playWhenReady,
+            "is_playing" to exo?.isPlaying,
+            "position_ms" to exo?.currentPosition?.coerceAtLeast(0),
+        )
         effectScope.cancel()
         effects.release()
         session?.run {

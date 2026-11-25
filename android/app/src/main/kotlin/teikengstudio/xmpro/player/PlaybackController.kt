@@ -50,6 +50,7 @@ class PlaybackController(private val context: Context) {
     private var controller: MediaController? = null
     private var playbackStarted: (() -> Unit)? = null
     private var pending: ((MediaController) -> Unit)? = null
+    private var lastLoggedSnapshot: String? = null
 
     private val listener = object : Player.Listener {
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -65,16 +66,49 @@ class PlaybackController(private val context: Context) {
                 positionMs = where,
             )
             _state.update { it.copy(playing = false) }
+            PlaybackDiagnostics.record(
+                context,
+                "controller_player_error",
+                "error_code" to error.errorCode,
+                "error_name" to error.errorCodeName,
+                "cause_types" to PlaybackDiagnostics.causeTypes(error),
+                "http_status" to PlaybackDiagnostics.httpStatus(error),
+                "position_ms" to where,
+            )
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) {
-                _ended.tryEmit(controller?.currentMediaItem?.mediaId)
+                val mediaId = controller?.currentMediaItem?.mediaId
+                val emitted = _ended.tryEmit(mediaId)
+                // long: SharedFlow 无订阅者时可能仍接受发送，订阅数可区分“发送成功”和“队列确实在监听”。
+                PlaybackDiagnostics.record(
+                    context,
+                    "controller_ended_emit",
+                    "has_media_item" to (controller?.currentMediaItem != null),
+                    "emit_accepted" to emitted,
+                    "subscriber_count" to _ended.subscriptionCount.value,
+                    "position_ms" to (controller?.currentPosition ?: 0L).coerceAtLeast(0),
+                )
             }
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
             val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0
+            val snapshot = "${player.playbackState}:${player.playWhenReady}:${player.isPlaying}:${player.playbackSuppressionReason}"
+            if (snapshot != lastLoggedSnapshot) {
+                lastLoggedSnapshot = snapshot
+                PlaybackDiagnostics.record(
+                    context,
+                    "controller_player_state",
+                    "state" to PlaybackDiagnostics.playerState(player.playbackState),
+                    "play_when_ready" to player.playWhenReady,
+                    "is_playing" to player.isPlaying,
+                    "suppression" to player.playbackSuppressionReason,
+                    "position_ms" to player.currentPosition.coerceAtLeast(0),
+                    "buffered_ms" to player.bufferedPosition.coerceAtLeast(0),
+                )
+            }
             _state.update {
                 it.copy(
                     playing = player.isPlaying,
@@ -88,12 +122,22 @@ class PlaybackController(private val context: Context) {
     /** Connects once; safe to call from every Activity start. */
     fun connect() {
         if (controller != null) return
+        PlaybackDiagnostics.record(context, "controller_connect_begin")
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         val future = MediaController.Builder(context, token).buildAsync()
         future.addListener({
-            val mediaController = runCatching { future.get() }.getOrNull() ?: return@addListener
+            val result = runCatching { future.get() }
+            val mediaController = result.getOrElse {
+                PlaybackDiagnostics.record(
+                    context,
+                    "controller_connect_failed",
+                    "error_type" to it.javaClass.simpleName,
+                )
+                return@addListener
+            }
             controller = mediaController
             mediaController.addListener(listener)
+            PlaybackDiagnostics.record(context, "controller_connect_ready")
             pending?.let {
                 pending = null
                 it(mediaController)
@@ -102,6 +146,7 @@ class PlaybackController(private val context: Context) {
     }
 
     fun release() {
+        PlaybackDiagnostics.record(context, "controller_release")
         controller?.removeListener(listener)
         controller?.release()
         controller = null
@@ -123,6 +168,13 @@ class PlaybackController(private val context: Context) {
         onStarted: () -> Unit,
     ) {
         playbackStarted = onStarted
+        PlaybackDiagnostics.record(
+            context,
+            "controller_start_request",
+            "source" to "queue_resolve_complete",
+            "duration_ms" to durationMs,
+            "position_ms" to startPositionMs.coerceAtLeast(0),
+        )
         withController { media ->
             _error.value = null
             media.setMediaItem(
@@ -147,6 +199,14 @@ class PlaybackController(private val context: Context) {
                     durationMs = 0,
                 )
             }
+            PlaybackDiagnostics.record(
+                context,
+                "controller_start_issued",
+                "state" to PlaybackDiagnostics.playerState(media.playbackState),
+                "play_when_ready" to media.playWhenReady,
+                "is_playing" to media.isPlaying,
+                "position_ms" to media.currentPosition.coerceAtLeast(0),
+            )
             playbackStarted?.invoke()
             playbackStarted = null
         }

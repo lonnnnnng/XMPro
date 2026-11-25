@@ -1,6 +1,7 @@
 package teikengstudio.xmpro.ui
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,7 @@ import teikengstudio.xmpro.model.episodeHint
 import teikengstudio.xmpro.player.EffectBus
 import teikengstudio.xmpro.player.EffectPreset
 import teikengstudio.xmpro.player.PlaybackQueueBridge
+import teikengstudio.xmpro.player.PlaybackDiagnostics
 
 /** Result bundle of the four independent library requests. */
 private data class ListeningLoad(
@@ -295,6 +297,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
     val positionMs: StateFlow<Long> = _position.asStateFlow()
 
     init {
+        PlaybackDiagnostics.record(context, "viewmodel_created")
         // Hand the stored preset to the service before anything plays.
         EffectBus.publish(
             EffectPreset.of(container.effectPreset()),
@@ -308,11 +311,22 @@ class MainViewModel(private val context: Context, private val container: AppCont
         }
         viewModelScope.launch {
             playback.state.collect { player ->
+                val previous = _state.value.isPlaying
                 _state.update {
                     it.copy(
                         playingTitle = player.title,
                         isPlaying = player.playing,
                         durationMs = player.durationMs,
+                    )
+                }
+                if (previous != player.playing) {
+                    PlaybackDiagnostics.record(
+                        context,
+                        "viewmodel_playing_changed",
+                        "is_playing" to player.playing,
+                        "has_title" to (player.title != null),
+                        "position_ms" to player.positionMs,
+                        "duration_ms" to player.durationMs,
                     )
                 }
                 publishPosition()
@@ -336,7 +350,12 @@ class MainViewModel(private val context: Context, private val container: AppCont
         }
         // A track that runs to its end stops the player; roll on to the queue's
         // next episode instead of stopping silently.
-        viewModelScope.launch { playback.ended.collect { mediaId -> onTrackEnded(mediaId) } }
+        viewModelScope.launch {
+            playback.ended.collect { mediaId ->
+                PlaybackDiagnostics.record(context, "viewmodel_ended_received", "has_media_id" to (mediaId != null))
+                onTrackEnded(mediaId)
+            }
+        }
         viewModelScope.launch {
             container.downloads.tasks.collect { tasks ->
                 _state.update {
@@ -870,8 +889,21 @@ class MainViewModel(private val context: Context, private val container: AppCont
         retryResolveFailures: Boolean = false,
         automaticAdvance: Boolean = false,
     ) {
-        val track = queue.getOrNull(index) ?: return
-        if (automaticAdvance && automaticAdvanceInFlight) return
+        val track = queue.getOrNull(index) ?: run {
+            PlaybackDiagnostics.record(
+                context,
+                "queue_request_rejected",
+                "reason" to "index_out_of_bounds",
+                "index" to index,
+                "queue_size" to queue.size,
+                "automatic" to automaticAdvance,
+            )
+            return
+        }
+        if (automaticAdvance && automaticAdvanceInFlight) {
+            PlaybackDiagnostics.record(context, "queue_request_rejected", "reason" to "advance_in_flight", "automatic" to true)
+            return
+        }
         if (automaticAdvance) {
             // long: 500 ms 进度轮询可能在下一集地址返回前多次观察到同一片尾位置。
             automaticAdvanceInFlight = true
@@ -893,9 +925,21 @@ class MainViewModel(private val context: Context, private val container: AppCont
             )
         }
         val request = ++playRequest
+        PlaybackDiagnostics.record(
+            context,
+            "queue_request_started",
+            "request" to request,
+            "automatic" to automaticAdvance,
+            "queue_index" to index,
+            "queue_size" to queue.size,
+            "retry_resolve" to retryResolveFailures,
+        )
         viewModelScope.launch {
             var retry = 0
+            val requestStartedAt = SystemClock.elapsedRealtime()
             while (true) {
+                var resolveStartedAt = 0L
+                var stage = "local_file_lookup"
                 try {
                     val quality = _state.value.quality
                     // A downloaded episode plays from disk: no resolution round trip,
@@ -905,20 +949,47 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     var played = track
                     var label = if (local != null) "本地文件" else ""
                     if (local == null) {
+                        stage = "resolve_url"
+                        resolveStartedAt = SystemClock.elapsedRealtime()
+                        PlaybackDiagnostics.record(
+                            context,
+                            "next_url_resolve_started",
+                            "request" to request,
+                            "automatic" to automaticAdvance,
+                            "attempt" to (retry + 1),
+                        )
                         val resolved = withContext(Dispatchers.IO) {
                             container.client(container.activeAccount).resolve(track.number, quality)
                         }
+                        PlaybackDiagnostics.record(
+                            context,
+                            "next_url_resolve_succeeded",
+                            "request" to request,
+                            "automatic" to automaticAdvance,
+                            "attempt" to (retry + 1),
+                            "elapsed_ms" to (SystemClock.elapsedRealtime() - resolveStartedAt),
+                        )
                         url = resolved.url
                         played = resolved.track
                         label = resolved.actualQuality
                     }
                     // A newer tap already won; drop this result instead of overriding it.
-                    if (request != playRequest) return@launch
+                    if (request != playRequest) {
+                        PlaybackDiagnostics.record(
+                            context,
+                            "queue_request_superseded",
+                            "request" to request,
+                            "current_request" to playRequest,
+                            "stage" to stage,
+                        )
+                        return@launch
+                    }
                     val startAt = if (resumePositionMs > 0) {
                         resumePositionMs
                     } else {
                         introSeekMs(played.duration)
                     }
+                    stage = "start_player"
                     playback.setVolume(_state.value.playVolume)
                     playback.setSpeed(_state.value.speed)
                     // The resolve payload does not always carry the length, but the
@@ -939,6 +1010,12 @@ class MainViewModel(private val context: Context, private val container: AppCont
                         startPositionMs = startAt,
                     ) {
                         if (request != playRequest) return@start
+                        PlaybackDiagnostics.record(
+                            context,
+                            "queue_start_command_callback",
+                            "request" to request,
+                            "automatic" to automaticAdvance,
+                        )
                         automaticAdvanceInFlight = false
                         sessionTrack = played
                         sessionStartedAt = System.currentTimeMillis()
@@ -952,11 +1029,48 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     }
                     return@launch
                 } catch (error: Exception) {
-                    if (error is CancellationException) throw error
-                    if (request != playRequest) return@launch
+                    if (error is CancellationException) {
+                        // long: 记录自动切集协程取消时所处阶段，区分页面生命周期取消与网络解析迟迟未返回。
+                        PlaybackDiagnostics.record(
+                            context,
+                            "queue_request_cancelled",
+                            "request" to request,
+                            "automatic" to automaticAdvance,
+                            "attempt" to (retry + 1),
+                            "stage" to stage,
+                            "elapsed_ms" to (SystemClock.elapsedRealtime() - requestStartedAt),
+                            "cause_types" to PlaybackDiagnostics.causeTypes(error),
+                        )
+                        throw error
+                    }
+                    if (request != playRequest) {
+                        PlaybackDiagnostics.record(
+                            context,
+                            "queue_request_superseded",
+                            "request" to request,
+                            "current_request" to playRequest,
+                            "stage" to stage,
+                            "cause_types" to PlaybackDiagnostics.causeTypes(error),
+                        )
+                        return@launch
+                    }
                     val canRetry = retryResolveFailures &&
                         (error as? XmlyException)?.definitive != true &&
                         retry < MAX_QUEUE_RESOLVE_RETRIES
+                    PlaybackDiagnostics.record(
+                        context,
+                        "queue_request_failed",
+                        "request" to request,
+                        "automatic" to automaticAdvance,
+                        "attempt" to (retry + 1),
+                        "resolve_elapsed_ms" to resolveStartedAt.takeIf { it > 0L }
+                            ?.let { SystemClock.elapsedRealtime() - it },
+                        "retry" to canRetry,
+                        "definitive" to ((error as? XmlyException)?.definitive == true),
+                        "error_type" to error.javaClass.simpleName,
+                        "cause_types" to PlaybackDiagnostics.causeTypes(error),
+                        "http_status" to PlaybackDiagnostics.httpStatus(error),
+                    )
                     if (canRetry) {
                         retry++
                         _state.update { it.copy(message = "下一集连接暂时不可用，正在重试…") }
@@ -1087,15 +1201,34 @@ class MainViewModel(private val context: Context, private val container: AppCont
      */
     private fun onTrackEnded(mediaId: String?) {
         val current = _state.value
-        if (current.queue.isEmpty()) return
+        if (current.queue.isEmpty()) {
+            PlaybackDiagnostics.record(context, "queue_end_ignored", "reason" to "empty_queue")
+            return
+        }
         val now = System.currentTimeMillis()
         // Swapping media makes the player report ENDED for the item that is
         // leaving; rolling on then would jump straight past the episode the user
         // just picked.
-        if (mediaId != null && current.playing != null && mediaId != current.playing?.id) return
-        if (now - lastPlayStartedAt < 1500L) return
-        if (now - lastAdvanceAt < 2000L) return
+        if (mediaId != null && current.playing != null && mediaId != current.playing?.id) {
+            PlaybackDiagnostics.record(context, "queue_end_ignored", "reason" to "stale_media_item")
+            return
+        }
+        if (now - lastPlayStartedAt < 1500L) {
+            PlaybackDiagnostics.record(context, "queue_end_ignored", "reason" to "recent_start")
+            return
+        }
+        if (now - lastAdvanceAt < 2000L) {
+            PlaybackDiagnostics.record(context, "queue_end_ignored", "reason" to "recent_advance")
+            return
+        }
         lastAdvanceAt = now
+        PlaybackDiagnostics.record(
+            context,
+            "queue_end_accepted",
+            "queue_index" to current.queueIndex,
+            "queue_size" to current.queue.size,
+            "sleep_at_track_end" to current.sleepAtTrackEnd,
+        )
         syncProgress()
         if (current.sleepAtTrackEnd) {
             pauseForSleep("本集播完，已停止播放")
@@ -1204,6 +1337,12 @@ class MainViewModel(private val context: Context, private val container: AppCont
      * recorded nothing at all.
      */
     fun onAppBackgrounded() {
+        PlaybackDiagnostics.record(
+            context,
+            "activity_backgrounded",
+            "has_session_track" to (sessionTrack != null),
+            "is_playing" to _state.value.isPlaying,
+        )
         if (sessionTrack == null) return
         syncProgress()
     }
@@ -1226,6 +1365,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
 
     /** Reloads the cloud history after the app returns to the foreground. */
     fun onAppForegrounded() {
+        PlaybackDiagnostics.record(context, "activity_foregrounded", "is_playing" to _state.value.isPlaying)
         refreshHistory()
         autoCheckUpdateSoon()
     }
@@ -2481,6 +2621,15 @@ class MainViewModel(private val context: Context, private val container: AppCont
     }
 
     override fun onCleared() {
+        // long: 队列解析由 ViewModel 协程持有，记录清理时间可判断锁屏期间是否发生生命周期取消。
+        PlaybackDiagnostics.record(
+            context,
+            "viewmodel_cleared",
+            "has_session_track" to (sessionTrack != null),
+            "is_playing" to _state.value.isPlaying,
+            "queue_index" to _state.value.queueIndex,
+            "queue_size" to _state.value.queue.size,
+        )
         ticker?.cancel()
         login.clear()
         super.onCleared()

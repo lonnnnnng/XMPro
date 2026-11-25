@@ -1,5 +1,9 @@
 package teikengstudio.xmpro.ui
 
+import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,6 +18,7 @@ import androidx.compose.ui.res.painterResource
 import teikengstudio.xmpro.R
 import teikengstudio.xmpro.ui.theme.XmproShapes
 import teikengstudio.xmpro.ui.theme.XmproSpacing
+import teikengstudio.xmpro.player.PlaybackDiagnostics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,7 +29,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -428,6 +432,7 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    LockScreenPlaybackSettings()
                     Spacer(Modifier.height(bottomInset))
                 }
             }
@@ -572,6 +577,66 @@ fun SettingsScreen(
                 page = SettingsPage.Account
             },
         )
+    }
+}
+
+@Composable
+private fun LockScreenPlaybackSettings() {
+    val context = LocalContext.current
+    val powerManager = remember(context) { context.getSystemService(PowerManager::class.java) }
+    var batteryExempt by remember(context) {
+        mutableStateOf(powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true)
+    }
+    val settingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        batteryExempt = powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+        PlaybackDiagnostics.record(context, "battery_exemption_settings_returned", "enabled" to batteryExempt)
+    }
+
+    SettingsGroup {
+        Column(Modifier.fillMaxWidth().padding(XmproSpacing.cardContent)) {
+            Text(
+                "锁屏连续播放",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "锁屏后系统或厂商的省电策略可能限制后台网络，导致一集结束后暂时无法获取下一集地址。允许 XMPro 忽略电池优化可能改善这一情况，但会增加待机耗电，部分机型还需单独允许后台运行。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = XmproSpacing.compactSpacing),
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = XmproSpacing.compactSpacing),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (batteryExempt) "系统省电豁免已开启" else "系统省电豁免未开启",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (batteryExempt) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = {
+                        val intent = if (batteryExempt) {
+                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                        } else {
+                            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                        }
+                        PlaybackDiagnostics.record(context, "battery_exemption_settings_opened", "currently_enabled" to batteryExempt)
+                        runCatching { settingsLauncher.launch(intent) }.onFailure {
+                            settingsLauncher.launch(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                        }
+                    },
+                ) {
+                    Text(if (batteryExempt) "管理" else "允许")
+                }
+            }
+        }
     }
 }
 
