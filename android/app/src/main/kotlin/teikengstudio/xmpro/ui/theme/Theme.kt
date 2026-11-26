@@ -27,8 +27,8 @@ import androidx.compose.ui.text.TextStyle
 // long: 全局字号统一收紧以增加首屏信息量，同时保留 Material 3 层级和系统字体缩放响应。
 private val CompactTypography = Typography().compact(scale = 0.90f)
 
-// long: 以现有界面为基准统一缩小字号、图标、间距和圆角，避免各页面单独缩放后比例不一致。
-internal const val AppUiScale = 0.8f
+// long: 统一按全局比例放大字号、图标、间距和圆角，避免各页面单独调整后风格不一致。
+internal const val AppUiScale = 0.96f
 
 private fun Typography.compact(scale: Float): Typography = copy(
     displayLarge = displayLarge.compact(scale),
