@@ -484,6 +484,20 @@ class AppContainer(context: Context) {
 
     // ---------------------------------------------------------------- settings
 
+    /** long: 将全局缩放与其他外观设置共同保存，应用重启和备份恢复后继续使用。 */
+    fun uiScale(): Float = store.state().optJSONObject("settings")
+        ?.optJSONObject("appearance")?.optDouble("uiScale", 0.96)
+        ?.toFloat()?.coerceIn(0.80f, 1.20f) ?: 0.96f
+
+    fun setUiScale(scale: Float) {
+        val value = scale.coerceIn(0.80f, 1.20f)
+        store.transaction { state ->
+            val settings = state.optJSONObject("settings") ?: org.json.JSONObject().also { state.put("settings", it) }
+            val appearance = settings.optJSONObject("appearance") ?: org.json.JSONObject().also { settings.put("appearance", it) }
+            appearance.put("uiScale", value.toDouble())
+        }
+    }
+
     fun themeMode(): String = store.state().optJSONObject("settings")
         ?.optJSONObject("appearance")?.optString("themeMode")?.takeIf { it.isNotEmpty() } ?: "system"
 

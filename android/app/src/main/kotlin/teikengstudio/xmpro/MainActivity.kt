@@ -24,15 +24,25 @@ import androidx.compose.ui.graphics.toArgb
 import teikengstudio.xmpro.ui.ShellScreen
 import teikengstudio.xmpro.ui.theme.XmproTheme
 import teikengstudio.xmpro.ui.theme.AppUiScale
+import teikengstudio.xmpro.ui.theme.DefaultAppUiScale
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(newBase)
+        val scale = runCatching {
+            (newBase.applicationContext as? XmproApp)?.container?.uiScale()
+        }.getOrNull() ?: DefaultAppUiScale
+        AppUiScale = scale
         // long: 在界面资源入口统一缩放，独立窗口中的弹窗和原生验证码也使用同一密度；不修改系统设置或字体偏好。
         applyOverrideConfiguration(Configuration().apply {
             densityDpi = (newBase.resources.configuration.densityDpi * AppUiScale).roundToInt()
         })
+    }
+
+    private fun restartForUiScale() {
+        // long: 重建主界面让 attachBaseContext 按新比例创建所有窗口，同时保留应用级播放器服务。
+        recreate()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -99,6 +109,10 @@ class MainActivity : ComponentActivity() {
                     onAppearanceChange = { useDynamic, seed ->
                         dynamicColor = useDynamic
                         seedColor = androidx.compose.ui.graphics.Color(seed)
+                    },
+                    onUiScaleSave = { scale ->
+                        container.setUiScale(scale)
+                        restartForUiScale()
                     },
                 )
             }

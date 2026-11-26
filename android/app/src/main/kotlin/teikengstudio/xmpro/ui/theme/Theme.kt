@@ -28,7 +28,12 @@ import androidx.compose.ui.text.TextStyle
 private val CompactTypography = Typography().compact(scale = 0.90f)
 
 // long: 统一按全局比例放大字号、图标、间距和圆角，避免各页面单独调整后风格不一致。
-internal const val AppUiScale = 0.96f
+internal const val DefaultAppUiScale = 0.96f
+internal const val AppUiScaleMin = 0.80f
+internal const val AppUiScaleMax = 1.20f
+
+// long: 由 Activity 在创建前载入设置；Compose 的间距和触控区域通过 getter 读取最新比例。
+internal var AppUiScale = DefaultAppUiScale
 
 private fun Typography.compact(scale: Float): Typography = copy(
     displayLarge = displayLarge.compact(scale),
@@ -66,8 +71,8 @@ object XmproSpacing {
     val compactCardContent = 8.dp
     val listRowVertical = 4.dp
     val compactRowVertical = 3.dp
-    // long: 视觉缩小后仍保留设备上的 48dp 点击范围，主控无需精确点中小图标。
-    val minimumTouchTarget = 48.dp / AppUiScale
+    // long: 任意缩放比例下都保留设备上的 48dp 点击范围，主控无需精确点中小图标。
+    val minimumTouchTarget get() = 48.dp / AppUiScale
     val bottomBarContentReserve = 88.dp
     val playerBarContentReserve = 92.dp
 }

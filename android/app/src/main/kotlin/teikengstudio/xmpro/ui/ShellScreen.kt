@@ -72,6 +72,7 @@ fun ShellScreen(
     onOledBlackChange: (Boolean) -> Unit,
     onThemeModeChange: (String) -> Unit = {},
     onAppearanceChange: (dynamic: Boolean, seed: Int) -> Unit = { _, _ -> },
+    onUiScaleSave: (Float) -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as XmproApp
@@ -246,6 +247,7 @@ fun ShellScreen(
                         state = state,
                         bottomInset = contentBottom,
                         themeMode = themeMode,
+                        uiScale = container.uiScale(),
                         oledBlack = oledBlack,
                         onSignIn = viewModel::signIn,
                         onSignOut = viewModel::signOut,
@@ -278,6 +280,7 @@ fun ShellScreen(
                         onDismissUpdate = viewModel::clearUpdateResult,
                         onDynamicColor = viewModel::setDynamicColor,
                         onSeedColor = viewModel::setSeedColor,
+                        onUiScaleSave = onUiScaleSave,
                         onOpenSocial = viewModel::openSocial,
                         onPauseDownload = viewModel::pauseDownload,
                         onResumeDownload = viewModel::resumeDownload,

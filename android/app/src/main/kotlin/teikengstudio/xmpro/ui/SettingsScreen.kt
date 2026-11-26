@@ -75,6 +75,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -97,6 +98,8 @@ import java.util.Date
 import java.util.Locale
 import teikengstudio.xmpro.data.AccountSummary
 import teikengstudio.xmpro.ui.theme.SeedPresets
+import teikengstudio.xmpro.ui.theme.AppUiScaleMax
+import teikengstudio.xmpro.ui.theme.AppUiScaleMin
 
 private enum class SettingsPage { Root, Account, Playback, Downloads, Appearance, Backup, About }
 
@@ -218,6 +221,7 @@ fun SettingsScreen(
     state: UiState,
     bottomInset: Dp,
     themeMode: String,
+    uiScale: Float,
     oledBlack: Boolean,
     onSignIn: (String) -> Unit,
     onSignOut: () -> Unit,
@@ -246,6 +250,7 @@ fun SettingsScreen(
     onDismissUpdate: () -> Unit = {},
     onDynamicColor: (Boolean) -> Unit,
     onSeedColor: (Int) -> Unit,
+    onUiScaleSave: (Float) -> Unit,
     onOpenSocial: (String) -> Unit,
     onPauseDownload: (String) -> Unit = {},
     onResumeDownload: (String) -> Unit = {},
@@ -453,6 +458,8 @@ fun SettingsScreen(
 
             SettingsPage.Appearance -> {
                 PageHeader("外观", onBack = { page = SettingsPage.Root })
+                var draftUiScale by remember(uiScale) { mutableFloatStateOf(uiScale) }
+                val scaleChanged = kotlin.math.abs(draftUiScale - uiScale) >= 0.005f
                 Column(
                     Modifier
                         .fillMaxSize()
@@ -466,6 +473,43 @@ fun SettingsScreen(
                             selected = themeMode,
                             onSelect = onThemeMode,
                         )
+                    }
+                    SettingsGroup {
+                        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("界面缩放", style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        "80%–120%，保存后重启应用生效",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 2.dp),
+                                    )
+                                }
+                                Text(
+                                    "${(draftUiScale * 100).roundToInt()}%",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            Slider(
+                                value = draftUiScale,
+                                onValueChange = { value ->
+                                    draftUiScale = (value * 100f).roundToInt() / 100f
+                                },
+                                valueRange = AppUiScaleMin..AppUiScaleMax,
+                                steps = 39,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                            Button(
+                                onClick = { onUiScaleSave(draftUiScale) },
+                                enabled = scaleChanged,
+                                shape = CircleShape,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("保存并重启")
+                            }
+                        }
                     }
                     SettingsGroup {
                         Row(
