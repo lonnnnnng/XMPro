@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
@@ -17,11 +18,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.TextStyle
 
 // long: 全局字号统一收紧以增加首屏信息量，同时保留 Material 3 层级和系统字体缩放响应。
 private val CompactTypography = Typography().compact(scale = 0.90f)
+
+// long: 以现有界面为基准统一缩小字号、图标、间距和圆角，避免各页面单独缩放后比例不一致。
+internal const val AppUiScale = 0.8f
 
 private fun Typography.compact(scale: Float): Typography = copy(
     displayLarge = displayLarge.compact(scale),
@@ -59,9 +66,10 @@ object XmproSpacing {
     val compactCardContent = 8.dp
     val listRowVertical = 4.dp
     val compactRowVertical = 3.dp
-    val minimumTouchTarget = 48.dp
+    // long: 视觉缩小后仍保留设备上的 48dp 点击范围，主控无需精确点中小图标。
+    val minimumTouchTarget = 48.dp / AppUiScale
     val bottomBarContentReserve = 88.dp
-    val playerBarContentReserve = 76.dp
+    val playerBarContentReserve = 92.dp
 }
 
 object XmproShapes {
@@ -244,7 +252,22 @@ fun XmproTheme(
     } else {
         base
     }
-    MaterialTheme(colorScheme = scheme, typography = CompactTypography, content = content)
+    val systemViewConfiguration = LocalViewConfiguration.current
+    val touchConfiguration = remember(systemViewConfiguration) {
+        object : ViewConfiguration by systemViewConfiguration {
+            override val minimumTouchTargetSize: DpSize
+                get() = DpSize(
+                    systemViewConfiguration.minimumTouchTargetSize.width / AppUiScale,
+                    systemViewConfiguration.minimumTouchTargetSize.height / AppUiScale,
+                )
+        }
+    }
+    CompositionLocalProvider(
+        LocalViewConfiguration provides touchConfiguration,
+        LocalMinimumInteractiveComponentSize provides XmproSpacing.minimumTouchTarget,
+    ) {
+        MaterialTheme(colorScheme = scheme, typography = CompactTypography, content = content)
+    }
 }
 
 /**

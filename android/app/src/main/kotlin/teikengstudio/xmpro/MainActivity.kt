@@ -1,7 +1,9 @@
 package teikengstudio.xmpro
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -21,8 +23,25 @@ import androidx.core.view.WindowCompat
 import androidx.compose.ui.graphics.toArgb
 import teikengstudio.xmpro.ui.ShellScreen
 import teikengstudio.xmpro.ui.theme.XmproTheme
+import teikengstudio.xmpro.ui.theme.AppUiScale
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        // long: 在界面资源入口统一缩放，独立窗口中的弹窗和原生验证码也使用同一密度；不修改系统设置或字体偏好。
+        applyOverrideConfiguration(Configuration().apply {
+            densityDpi = (newBase.resources.configuration.densityDpi * AppUiScale).roundToInt()
+        })
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val expectedDensity = (baseContext.resources.configuration.densityDpi * AppUiScale).roundToInt()
+        // long: 用户更改系统显示大小时重建界面以重新应用比例，播放队列仍由应用级 ViewModel 持有。
+        if (resources.configuration.densityDpi != expectedDensity) recreate()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
