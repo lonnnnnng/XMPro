@@ -175,6 +175,7 @@ data class UiState(
     val subscriptionTotals: Map<String, Int> = emptyMap(),
     val socialUsers: List<teikengstudio.xmpro.model.SocialUser> = emptyList(),
     val socialLoading: Boolean = false,
+    val socialBusyKeys: Set<String> = emptySet(),
     val favoriteIds: Set<String> = emptySet(),
     /** Comments sheet for the playing track. */
     val commentsOpen: Boolean = false,
@@ -233,6 +234,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
     private var albumRequest = 0
     private var albumRangeRequest = 0
     private var listeningRequest = 0
+    private var socialRequest = 0
     /** Guards the automatic recovery so a dead stream cannot loop for ever. */
     private var recoverTrack: String? = null
     private var recoverAttempts = 0
@@ -1879,20 +1881,26 @@ class MainViewModel(private val context: Context, private val container: AppCont
 
     /** Opens the 我的 sheet for [kind] and fetches its list. */
     fun openSocial(kind: String) {
+        val request = ++socialRequest
+        val identity = container.activeAccount
         _state.update {
             it.copy(socialKind = kind, socialUsers = emptyList(), socialLoading = kind == "following" || kind == "fans")
         }
         if (kind != "following" && kind != "fans") return
-        val uid = _state.value.accounts.firstOrNull { it.active }?.uid
-            ?: _state.value.accounts.firstOrNull { it.primary }?.uid
-            ?: return
+        val uid = _state.value.accounts.firstOrNull { it.identity == identity }?.uid
+        if (uid.isNullOrEmpty() || identity == null) {
+            _state.update { it.copy(socialLoading = false, message = "请先登录") }
+            return
+        }
         viewModelScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    val experience = XmlyExperience(container.client(container.activeAccount))
+                    val experience = XmlyExperience(container.client(identity))
                     if (kind == "following") experience.following(uid) else experience.fans(uid)
                 }
             }
+            // long: 弹层关闭、切换账号或重新加载后，旧请求不能覆盖当前列表。
+            if (request != socialRequest || identity != container.activeAccount) return@launch
             _state.update {
                 it.copy(
                     socialUsers = result.getOrDefault(emptyList()),
@@ -1904,7 +1912,42 @@ class MainViewModel(private val context: Context, private val container: AppCont
     }
 
     fun closeSocial() {
+        socialRequest++
         _state.update { it.copy(socialKind = null, socialUsers = emptyList(), socialLoading = false) }
+    }
+
+    fun cancelFollow(uid: String) {
+        val identity = container.activeAccount ?: return
+        val busyKey = "$identity:$uid"
+        if (_state.value.account != identity || _state.value.socialKind != "following" ||
+            _state.value.socialUsers.none { it.uid == uid } || busyKey in _state.value.socialBusyKeys
+        ) return
+        _state.update { it.copy(socialBusyKeys = it.socialBusyKeys + busyKey) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { XmlyExperience(container.client(identity)).cancelFollow(uid) }
+                if (identity == container.activeAccount) {
+                    if (_state.value.socialKind == "following" && _state.value.socialLoading) {
+                        // long: 取消途中重新打开弹层时，补发最新列表而非只丢弃旧结果，否则会留下空白页。
+                        openSocial("following")
+                    }
+                    _state.update { state ->
+                        state.copy(
+                            socialUsers = if (state.socialKind == "following") state.socialUsers.filterNot { it.uid == uid }
+                                else state.socialUsers,
+                            message = "已取消关注",
+                        )
+                    }
+                }
+                // long: 写入成功后单独刷新本账号计数，资料查询失败不能误报为取消失败。
+                withContext(Dispatchers.IO) { runCatching { container.refreshProfile(identity) } }
+                if (identity == container.activeAccount) _state.update { it.copy(accounts = container.accounts()) }
+            } catch (error: Exception) {
+                if (identity == container.activeAccount) _state.update { it.copy(message = describe(error)) }
+            } finally {
+                _state.update { it.copy(socialBusyKeys = it.socialBusyKeys - busyKey) }
+            }
+        }
     }
 
     // ------------------------------------------------------------------ backup
@@ -2372,6 +2415,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
     }
 
     fun signOut() {
+        closeSocial()
         listeningRequest++
         homeRequest++
         searchRequest++
@@ -2445,6 +2489,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
      */
     fun switchAccount(identity: String) {
         if (identity == _state.value.account) return
+        closeSocial()
         listeningRequest++
         homeRequest++
         searchRequest++

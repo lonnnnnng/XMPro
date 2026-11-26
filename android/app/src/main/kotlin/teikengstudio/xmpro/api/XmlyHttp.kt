@@ -27,6 +27,7 @@ class XmlyHttp(
     private val client: OkHttpClient = defaultClient(),
     private val clock: () -> Instant = { Instant.now() },
     private val searchOrigin: String = SEARCH_ORIGIN,
+    private val diagnostics: (String) -> Unit = {},
 ) {
     private val cooldowns = ConcurrentHashMap<String, Instant>()
 
@@ -207,6 +208,17 @@ class XmlyHttp(
         responseLimit: Int,
         headers: Map<String, String>,
     ): Outcome {
+        val diagnosticId = diagnosticSequence.incrementAndGet()
+        val started = System.nanoTime()
+        fun record(status: Int? = null, response: String? = null, error: String? = null) {
+            if (AccountRequestDiagnostics.accepts(path)) runCatching {
+                diagnostics(AccountRequestDiagnostics.event(
+                    diagnosticId, method, path, body, credentials, status, response,
+                    (System.nanoTime() - started) / 1_000_000, error,
+                ))
+            }
+        }
+        record()
         val url: HttpUrl = (origin + path).toHttpUrl().newBuilder().apply {
             query.forEach { (key, value) -> addQueryParameter(key, value) }
         }.build()
@@ -226,15 +238,21 @@ class XmlyHttp(
         } else {
             builder.method(method, null)
         }
-        client.newCall(builder.build()).execute().use { response ->
-            val declared = response.header("Content-Length")?.toLongOrNull()
-            if (declared != null && declared > responseLimit) {
-                throw XmlyException("response_too_large", "响应超过 ${responseLimit / (1024 * 1024)} MiB 上限")
+        try {
+            client.newCall(builder.build()).execute().use { response ->
+                val declared = response.header("Content-Length")?.toLongOrNull()
+                if (declared != null && declared > responseLimit) {
+                    throw XmlyException("response_too_large", "响应超过 ${responseLimit / (1024 * 1024)} MiB 上限")
+                }
+                val stream = response.body?.byteStream()
+                val text = stream?.let { readBounded(it, responseLimit) } ?: ""
+                ServerClock.observeDateHeader(response.header("Date"))
+                record(response.code, text)
+                return Outcome(response.code, text, url.toString(), response.header("Retry-After"))
             }
-            val stream = response.body?.byteStream()
-            val text = stream?.let { readBounded(it, responseLimit) } ?: ""
-            ServerClock.observeDateHeader(response.header("Date"))
-            return Outcome(response.code, text, url.toString(), response.header("Retry-After"))
+        } catch (error: Exception) {
+            record(error = error.javaClass.simpleName)
+            throw error
         }
     }
 
@@ -362,6 +380,7 @@ class XmlyHttp(
         const val SEARCH_ORIGIN = "https://www.ximalaya.com"
         const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
         private const val MAX_ATTEMPTS = 5
+        private val diagnosticSequence = java.util.concurrent.atomic.AtomicLong()
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .retryOnConnectionFailure(false)

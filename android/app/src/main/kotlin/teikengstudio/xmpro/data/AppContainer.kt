@@ -31,7 +31,9 @@ class AppContainer(context: Context) {
 
     val credentials = SecureCredentials(appContext)
 
-    private val http = XmlyHttp()
+    private val http = XmlyHttp(diagnostics = { AccountDiagnostics.record(appContext, it) })
+    private val rewardLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    private val profileLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
 
     /** Account-bound client, or the anonymous client when [identity] is null. */
     fun client(identity: String?): XmlyClient =
@@ -247,7 +249,8 @@ class AppContainer(context: Context) {
     }
 
     /** Fetches the account nickname/avatar and caches it in state.json. */
-    fun refreshProfile(identity: String): teikengstudio.xmpro.model.UserProfile {
+    fun refreshProfile(identity: String): teikengstudio.xmpro.model.UserProfile = synchronized(profileLocks.getOrPut(identity) { Any() }) {
+        // long: 连续取消多个关注时，串行查询并保存计数，避免较早的响应把新计数覆盖回去。
         val client = client(identity)
         val profile = XmlyExperience(client).profile()
         store.transaction { state ->
@@ -259,7 +262,7 @@ class AppContainer(context: Context) {
             profile.following?.let { record.put("following", it) }
             profile.subscriptions?.let { record.put("subscriptionCount", it) }
         }
-        return profile
+        profile
     }
 
     /** Local alias used when the official profile cannot be read. */
@@ -278,9 +281,9 @@ class AppContainer(context: Context) {
         return quota
     }
 
-    /** One manual claim; a failure pauses automatic claims for that account. */
-    fun claimOnce(identity: String): Quota {
-        return try {
+    /** long: 手动与自动领取共用账号锁，防止同一档奖励同时发出两次请求。 */
+    fun claimOnce(identity: String): Quota = synchronized(rewardLocks.getOrPut(identity) { Any() }) {
+        try {
             val client = client(identity)
             XmlyRewards(client).claim()
             val quota = client.quota(identity)
@@ -289,10 +292,12 @@ class AppContainer(context: Context) {
             }
             quota
         } catch (error: Exception) {
-            // A definitive refusal (daily cap, balance cap) says nothing about the
-            // account being broken, so it must not disable claiming permanently.
             val definitive = error is XmlyException && error.definitive
-            if (!definitive) {
+            if (error is XmlyException && error.code == "reward_complete") {
+                // long: 用户手动核对已确认全部到账，解除旧版误设的暂停，次日仍可正常自动领取。
+                resumeRewards(identity)
+            }
+            if (!definitive || (error is XmlyException && error.code == "reward_rejected")) {
                 store.transaction { state ->
                     state.optJSONObject("accounts")?.optJSONObject(identity)?.put("rewardPaused", true)
                 }
@@ -301,7 +306,7 @@ class AppContainer(context: Context) {
         }
     }
 
-    /** Welfare task list as plain JSON, for the diagnostics dialog. */
+    /** long: 用户核对领取结果后显式解除账号的自动领取暂停状态。 */
     fun resumeRewards(identity: String) {
         store.transaction { state ->
             state.optJSONObject("accounts")?.optJSONObject(identity)?.put("rewardPaused", false)
@@ -318,20 +323,20 @@ class AppContainer(context: Context) {
         }
     }
 
-    /**
-     * Top-up pass for the account list: refreshes the balance and, when
-     * automatic claiming is on, refills from below 2 h up to 4 h.
-     */
-    fun refreshRewards(identity: String): Quota {
+    /** long: 暂停标志必须在请求前生效，开关变化也要在同一轮每次领取前重新读取。 */
+    fun refreshRewards(identity: String): Quota = synchronized(rewardLocks.getOrPut(identity) { Any() }) {
         val client = client(identity)
         val rewards = XmlyRewards(client)
-        val quota = rewards.refresh(autoClaim()) { client.quota(identity) }
+        val quota = rewards.refresh(enabled = {
+            autoClaim() && store.state().optJSONObject("accounts")
+                ?.optJSONObject(identity)?.optBoolean("rewardPaused", false) == false
+        }) { client.quota(identity) }
         store.transaction { state ->
             val record = state.optJSONObject("accounts")?.optJSONObject(identity) ?: return@transaction
             record.put("quota", quota.toJson())
-            if (rewards.lastError.isNotEmpty()) record.put("rewardPaused", true)
+            if (rewards.shouldPause) record.put("rewardPaused", true)
         }
-        return quota
+        quota
     }
 
     private fun hint(deviceId: String): String =

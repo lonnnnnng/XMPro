@@ -285,6 +285,7 @@ fun ShellScreen(
                         onClearDownloads = viewModel::clearAllDownloads,
                         onPlayDownload = { viewModel.play(it) },
                         onCloseSocial = viewModel::closeSocial,
+                        onCancelFollow = viewModel::cancelFollow,
                         onOpenUser = viewModel::openUser,
                         onOpenAlbum = { albumId ->
                             viewModel.closeSocial()

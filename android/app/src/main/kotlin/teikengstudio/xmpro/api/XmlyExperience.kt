@@ -455,6 +455,18 @@ class XmlyExperience(private val client: XmlyClient) {
     /** People following this account (first page only). */
     fun fans(uid: String): List<SocialUser> = socialList(uid, "fansPageInfo", "fansInfoList")
 
+    /** long: 取消主播关注使用官网独立接口，不能把主播 UID 传给专辑退订接口。 */
+    fun cancelFollow(uid: String) {
+        requireAccount()
+        client.request(
+            "POST",
+            XmlyClient.WEB,
+            "/revision/follow/cancelFollow",
+            json = mapOf("followingUid" to xmlyIdentifier(uid)),
+            readOnly = false,
+        )
+    }
+
     private fun socialList(uid: String, pageKey: String, listKey: String): List<SocialUser> {
         val payload = client.request(
             "GET",

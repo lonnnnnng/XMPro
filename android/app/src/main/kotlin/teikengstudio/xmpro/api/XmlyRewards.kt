@@ -29,6 +29,9 @@ class XmlyRewards(
     var lastError: String = ""
         private set
 
+    var shouldPause: Boolean = false
+        private set
+
     private fun uid(): String {
         val account = client.credentials
             ?: throw XmlyException("login_expired", "领取或查询听时需要有效的登录态", definitive = true)
@@ -51,7 +54,13 @@ class XmlyRewards(
                 data.optString("message"),
                 response.optString("msg"),
             ).firstOrNull { it.isNotEmpty() }
-            throw XmlyException("reward_rejected", reason ?: "福利请求未成功，请在官方 App 检查", definitive = true)
+            val code = data.opt("code")?.toString()
+            val detail = reason ?: "福利请求未成功，请在官方 App 检查"
+            throw XmlyException(
+                "reward_rejected",
+                if (code == null) detail else "$detail（业务码 $code）",
+                definitive = true,
+            )
         }
         return data
     }
@@ -68,7 +77,13 @@ class XmlyRewards(
     }
 
     /** Claims once, using only fields the caller actually observed. */
-    fun claim(fields: Map<String, Any?> = emptyMap()): JSONObject {
+    fun claim(fields: Map<String, Any?> = emptyMap(), allowed: () -> Boolean = { true }): JSONObject {
+        // long: 服务端对领完后的额外请求也可能只返回“参数校验”，先用当天领取记录阻止重复写入。
+        if (allReceivedToday(tasks().getJSONObject("data"), clock())) {
+            throw XmlyException("reward_complete", "今日听时奖励已全部领取，请明天再来", definitive = true)
+        }
+        // long: 查询任务期间用户可能关闭自动领取，写请求发出前再检查一次，避免多领下一档。
+        if (!allowed()) throw XmlyException("reward_disabled", "自动领取已停止", definitive = true)
         val account = client.credentials
             ?: throw XmlyException("login_expired", "领取听时需要有效的登录态", definitive = true)
         val owner = uid()
@@ -95,30 +110,26 @@ class XmlyRewards(
         return JSONObject().put("data", result(response))
     }
 
-    /**
-     * Automatic claiming: takes every tier the server is still willing to grant.
-     *
-     * The old pass only ran below two hours and stopped at four, so an account
-     * that already had a balance never claimed anything. The server enforces the
-     * daily and balance caps, so the loop simply stops when a claim is refused.
-     */
-    fun refresh(enabled: Boolean, quota: () -> Quota): Quota {
+    /** long: 每次写入前重新查询领取记录与开关，已领完、用户关闭或结果未知时结束这一轮。 */
+    fun refresh(enabled: () -> Boolean, quota: () -> Quota): Quota {
         var current = quota()
         lastError = ""
-        if (!enabled) return current
+        shouldPause = false
+        if (!enabled()) return current
         for (round in 0 until MAX_CLAIMS) {
-            if (!enabled) break
+            if (!enabled()) break
             val before = current.remainingSeconds
             try {
-                claim()
+                claim(allowed = enabled)
                 current = quota()
             } catch (error: XmlyException) {
-                // Report the server's reason verbatim; a cap is not a failure of
-                // the account, so the caller can show it without pausing forever.
+                if (error.code in setOf("reward_complete", "reward_disabled")) break
                 lastError = error.message ?: "领取听时未完成"
+                shouldPause = !error.definitive || error.code == "reward_rejected"
                 break
             } catch (_: Exception) {
                 lastError = "领取听时未完成，请在官方 App 核对"
+                shouldPause = true
                 break
             }
             if (current.remainingSeconds <= before) break
@@ -151,35 +162,12 @@ class XmlyRewards(
         return result.sortedBy { it.seconds }
     }
 
-    /**
-     * Raw welfare task list for the diagnostics view.
-     *
-     * Nothing here is a secret, but the ticket and ad ids are dropped so the
-     * output can be read (or pasted) without leaking a session.
-     */
+    /** long: 诊断只复用白名单结果摘要，不能把任务响应中的身份或广告票据直接导出。 */
     fun taskDiagnostics(): String {
-        val data = tasks().optJSONObject("data") ?: JSONObject()
-        return (scrub(data) as JSONObject).toString(2)
-    }
-
-    private fun scrub(value: Any?): Any? = when (value) {
-        is JSONObject -> JSONObject().apply {
-            for (key in value.keys()) {
-                if (key.contains("ticket", true) || key.contains("token", true) ||
-                    key.contains("verifyStr", true) || key == "signature"
-                ) {
-                    put(key, "***")
-                } else {
-                    put(key, scrub(value.opt(key)))
-                }
-            }
-        }
-
-        is org.json.JSONArray -> org.json.JSONArray().apply {
-            for (index in 0 until value.length()) put(scrub(value.opt(index)))
-        }
-
-        else -> value
+        return AccountRequestDiagnostics.event(
+            0, "GET", "$PATH/queryVipDurationTask", null, client.credentials,
+            status = 200, response = tasks().toString(),
+        )
     }
 
     private fun normalize(fields: Map<String, Any?>): LinkedHashMap<String, Any?> {
@@ -207,6 +195,18 @@ class XmlyRewards(
     }
 
     companion object {
+        internal fun allReceivedToday(data: JSONObject, nowMillis: Long): Boolean {
+            val tiers = data.optJSONArray("tierList") ?: return false
+            if (tiers.length() == 0) return false
+            val zone = java.time.ZoneId.of("Asia/Shanghai")
+            val today = java.time.Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+            return (0 until tiers.length()).all { index ->
+                val row = tiers.optJSONObject(index) ?: return@all false
+                val received = (row.opt("receiveTime") as? Number)?.toLong() ?: return@all false
+                // long: 只信有效的实际领取时间，不把未核实的 status 枚举当作领取资格。
+                received > 0 && java.time.Instant.ofEpochMilli(received).atZone(zone).toLocalDate() == today
+            }
+        }
         private const val PATH = "/lite-earn/ting/welfare"
         private const val SALT = "0ab3443b71834b33be675af744d76ef0aaa74cd2b60c4b67"
         private val FIELDS = listOf(
@@ -218,10 +218,6 @@ class XmlyRewards(
             "isSecondPhaseCompleted",
             "sourceName",
         )
-        /** Below two hours the refill loop starts. */
-        const val LOW_WATER = 7200
-        /** It stops once four hours are available. */
-        const val TARGET = 14400
         /** Upper bound on one refill pass, so a stuck balance cannot loop forever. */
         private const val MAX_CLAIMS = 64
 

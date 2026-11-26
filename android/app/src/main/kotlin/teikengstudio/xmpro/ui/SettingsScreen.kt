@@ -253,6 +253,7 @@ fun SettingsScreen(
     onClearDownloads: () -> Unit = {},
     onPlayDownload: (teikengstudio.xmpro.model.Track) -> Unit = {},
     onCloseSocial: () -> Unit,
+    onCancelFollow: (String) -> Unit,
     onOpenUser: (String) -> Unit,
     onOpenAlbum: (String) -> Unit = {},
     onExportBackup: (android.net.Uri, Boolean) -> Unit,
@@ -543,6 +544,7 @@ fun SettingsScreen(
             kind = kind,
             state = state,
             onDismiss = onCloseSocial,
+            onCancelFollow = onCancelFollow,
             onOpenUser = onOpenUser,
             onOpenAlbum = onOpenAlbum,
         )
@@ -911,7 +913,11 @@ private fun ProfileHeader(
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(
-                        if (state.autoClaim) "自动领取·开" else "自动领取·关",
+                        when {
+                            !state.autoClaim -> "自动领取·关"
+                            account.paused -> "自动领取·暂停"
+                            else -> "自动领取·开"
+                        },
                         maxLines = 1,
                         softWrap = false,
                     )
@@ -1620,6 +1626,7 @@ private fun SocialSheet(
     state: UiState,
     onDismiss: () -> Unit,
     onOpenUser: (String) -> Unit,
+    onCancelFollow: (String) -> Unit,
     onOpenAlbum: (String) -> Unit = {},
 ) {
     val title = when (kind) {
@@ -1670,6 +1677,17 @@ private fun SocialSheet(
                             onClick = {
                                 onDismiss()
                                 onOpenUser(user.uid)
+                            },
+                            trailing = {
+                                if (kind == "following") {
+                                    val busy = "${state.account}:${user.uid}" in state.socialBusyKeys
+                                    TextButton(
+                                        onClick = { onCancelFollow(user.uid) },
+                                        enabled = !busy,
+                                    ) {
+                                        Text(if (busy) "取消中" else "取消关注")
+                                    }
+                                }
                             },
                         )
                     }
@@ -1722,6 +1740,7 @@ private fun SocialRow(
     subtitle: String,
     avatar: String?,
     onClick: (() -> Unit)? = null,
+    trailing: @Composable () -> Unit = {},
 ) {
     Row(
         Modifier
@@ -1750,6 +1769,7 @@ private fun SocialRow(
                 )
             }
         }
+        trailing()
     }
 }
 
