@@ -265,6 +265,26 @@ class AppContainer(context: Context) {
         profile
     }
 
+    /** long: 关注或订阅写入已成功时同步缓存计数，避免资料接口短暂返回旧快照。 */
+    fun adjustSocialCounts(
+        identity: String,
+        followingDelta: Int = 0,
+        subscriptionDelta: Int = 0,
+    ): List<AccountSummary> = synchronized(profileLocks.getOrPut(identity) { Any() }) {
+        if (followingDelta == 0 && subscriptionDelta == 0) return accounts()
+        store.transaction { state ->
+            val account = state.optJSONObject("accounts")?.optJSONObject(identity) ?: return@transaction
+            fun adjust(key: String, delta: Int) {
+                if (delta == 0) return
+                val count = account.optInt(key, -1)
+                if (count >= 0) account.put(key, (count + delta).coerceAtLeast(0))
+            }
+            adjust("following", followingDelta)
+            adjust("subscriptionCount", subscriptionDelta)
+        }
+        accounts()
+    }
+
     /** Local alias used when the official profile cannot be read. */
     fun renameAccount(identity: String, nickname: String) {
         store.transaction { state ->

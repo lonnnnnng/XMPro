@@ -1926,6 +1926,9 @@ class MainViewModel(private val context: Context, private val container: AppCont
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) { XmlyExperience(container.client(identity)).cancelFollow(uid) }
+                val updatedAccounts = withContext(Dispatchers.IO) {
+                    container.adjustSocialCounts(identity, followingDelta = -1)
+                }
                 if (identity == container.activeAccount) {
                     if (_state.value.socialKind == "following" && _state.value.socialLoading) {
                         // long: 取消途中重新打开弹层时，补发最新列表而非只丢弃旧结果，否则会留下空白页。
@@ -1933,15 +1936,13 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     }
                     _state.update { state ->
                         state.copy(
+                            accounts = updatedAccounts,
                             socialUsers = if (state.socialKind == "following") state.socialUsers.filterNot { it.uid == uid }
                                 else state.socialUsers,
                             message = "已取消关注",
                         )
                     }
                 }
-                // long: 写入成功后单独刷新本账号计数，资料查询失败不能误报为取消失败。
-                withContext(Dispatchers.IO) { runCatching { container.refreshProfile(identity) } }
-                if (identity == container.activeAccount) _state.update { it.copy(accounts = container.accounts()) }
             } catch (error: Exception) {
                 if (identity == container.activeAccount) _state.update { it.copy(message = describe(error)) }
             } finally {
@@ -2310,15 +2311,27 @@ class MainViewModel(private val context: Context, private val container: AppCont
     }
 
     fun setSubscribed(albumId: String, subscribed: Boolean) {
+        val identity = container.activeAccount ?: run {
+            _state.update { it.copy(message = "请先登录") }
+            return
+        }
+        val hadSubscription = _state.value.subscriptions.any { it.album.id == albumId }
+        val countDelta = when {
+            subscribed && !hadSubscription -> 1
+            !subscribed && hadSubscription -> -1
+            else -> 0
+        }
         val open = _state.value.album?.album?.takeIf { it.id == albumId }
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    val identity = container.activeAccount ?: throw XmlyException("login_required", "请先登录")
                     XmlyExperience(container.client(identity)).setSubscribed(albumId, subscribed)
                 }
-                // Subscribing used to leave the list untouched, so the album page
-                // kept reading "not subscribed" until the whole app reloaded.
+                val updatedAccounts = withContext(Dispatchers.IO) {
+                    container.adjustSocialCounts(identity, subscriptionDelta = countDelta)
+                }
+                if (identity != container.activeAccount) return@launch
+                // long: 写接口确认成功后立即同时更新订阅列表和资料缓存数量，资料接口可能暂时返回旧计数。
                 _state.update { state ->
                     val rows = if (subscribed) {
                         if (state.subscriptions.any { it.album.id == albumId }) {
@@ -2337,11 +2350,12 @@ class MainViewModel(private val context: Context, private val container: AppCont
                         state.subscriptions.filterNot { it.album.id == albumId }
                     }
                     state.copy(
+                        accounts = updatedAccounts,
                         subscriptions = rows,
                         message = if (subscribed) "已订阅" else "已取消订阅",
                     )
                 }
-                refreshSubscriptions(if (subscribed) open else null)
+                refreshSubscriptions(if (subscribed) open else null, identity)
             } catch (error: Exception) {
                 _state.update { it.copy(message = describe(error)) }
             }
@@ -2354,11 +2368,12 @@ class MainViewModel(private val context: Context, private val container: AppCont
      * [keep] survives the merge: a new subscription can fall outside the first
      * page, and dropping it there would flip the album back to "not subscribed".
      */
-    private suspend fun refreshSubscriptions(keep: Album? = null) {
-        val identity = container.activeAccount ?: return
+    private suspend fun refreshSubscriptions(keep: Album? = null, identity: String? = container.activeAccount) {
+        identity ?: return
         runCatching {
             withContext(Dispatchers.IO) { XmlyExperience(container.client(identity)).subscriptions(1) }
         }.onSuccess { page ->
+            if (identity != container.activeAccount) return@onSuccess
             val items = if (keep != null && page.items.none { it.album.id == keep.id }) {
                 listOf(SubscriptionItem(keep, "", 0, System.currentTimeMillis())) + page.items
             } else {
