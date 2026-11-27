@@ -257,11 +257,8 @@ fun PlayerSheet(
                             textAlign = TextAlign.Center,
                         )
 
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                            shape = XmproShapes.card,
-                            modifier = Modifier.fillMaxWidth().padding(top = XmproSpacing.sectionSpacing),
-                        ) {
+                        // long: 功能入口与下方主控使用同一页面底色，放大缩放时避免大卡片相互挤压。
+                        Column(Modifier.fillMaxWidth().padding(top = XmproSpacing.sectionSpacing)) {
                             Column(Modifier.padding(horizontal = XmproSpacing.componentSpacing)) {
                                 // long: 音质和音效与辅助操作集中展示，底部只保留五项主要播放控制。
                                 Row(
@@ -382,11 +379,7 @@ fun PlayerSheet(
                                 }
 
                                 // long: 应用内音量与系统媒体音量分开，归入辅助区以保持主播放控件连贯。
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceContainer,
-                                    shape = RoundedCornerShape(18.dp),
-                                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                                ) {
+                                Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                                     Row(
                                         Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -426,7 +419,7 @@ fun PlayerSheet(
                                 Surface(
                                     onClick = { queueOpen = true },
                                     shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    color = Color.Transparent,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Row(
@@ -776,12 +769,8 @@ private fun PlayerTransportControls(
     val livePosition by positionMs.collectAsState()
     val total = durationMs.coerceAtLeast(0)
     val shown = if (dragPosition >= 0f) dragPosition.toLong() else livePosition
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(24.dp),
-        // long: 抬高固定主控卡以平衡上方留白，同时为底部手势区保留足够间距。
-        modifier = Modifier.fillMaxWidth().padding(bottom = 36.dp),
-    ) {
+    // long: 主控留在底部方便单手操作，直接融入页面底色，避免与上方功能区形成两张卡片。
+    Column(Modifier.fillMaxWidth().padding(bottom = 36.dp)) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             PlayerSlider(
                 value = if (total > 0) (shown.toFloat() / total).coerceIn(0f, 1f) else 0f,
