@@ -31,8 +31,8 @@ android {
         applicationId = "teikengstudio.xmpro"
         minSdk = 24
         targetSdk = 35
-        versionCode = 32
-        versionName = "0.1.30"
+        versionCode = 33
+        versionName = "0.1.31"
         ndk { abiFilters += listOf("arm64-v8a") }
         resourceConfigurations += listOf("zh", "en")
     }
