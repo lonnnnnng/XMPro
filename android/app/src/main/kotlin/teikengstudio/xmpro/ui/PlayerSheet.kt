@@ -875,35 +875,49 @@ private fun PlayerSlider(
 }
 
 @Composable
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun PlayerActionButton(
     label: String,
     active: Boolean,
     onClick: () -> Unit,
 ) {
-    Box(
+    // long: 倍速入口沿用图标操作的圆形区与文字标签高度，四项操作的视觉中心和标签基线保持一致。
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(CircleShape)
-            .clickable(onClick = onClick)
-            .background(
-                if (active) {
-                    MaterialTheme.colorScheme.primaryContainer
+            .widthIn(min = 64.dp)
+            .heightIn(min = 72.dp)
+            .combinedClickable(role = Role.Button, onClick = onClick),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(
+                    if (active) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerLow
+                    },
+                ),
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = if (active) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
                 } else {
-                    MaterialTheme.colorScheme.surfaceContainerLow
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
-            .heightIn(min = 48.dp)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
+        }
         Text(
-            label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = if (active) {
-                MaterialTheme.colorScheme.onPrimaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
+            "倍速",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }
