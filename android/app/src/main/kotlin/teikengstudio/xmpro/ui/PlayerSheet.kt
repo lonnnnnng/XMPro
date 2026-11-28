@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -83,6 +84,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpSize
 import teikengstudio.xmpro.ui.theme.XmproShapes
 import teikengstudio.xmpro.ui.theme.XmproSpacing
@@ -154,313 +157,254 @@ fun PlayerSheet(
         }
     }
 
-    BoxWithConstraints(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-    ) {
-        // long: 按主题缩放后的实际可用空间计算封面，横屏和窄屏不会挤出底部主控。
-        val artworkSize = minOf(260.dp, maxWidth - 48.dp, maxHeight * 0.31f).coerceAtLeast(96.dp)
-        ThemedContent {
-            Column(Modifier.fillMaxSize().padding(horizontal = XmproSpacing.pageHorizontal)) {
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "收起")
-                    }
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+    // long: 全屏 Surface 拦截空白区域的触摸，取消滚动后也不能让手势落到背后的专辑列表。
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+        ) {
+            // long: 封面宽高同时减半，保留图片比例，把节省的空间交还给功能入口和主控。
+            val artworkMaxSize = minOf(260.dp, maxWidth - 48.dp, maxHeight * 0.31f).coerceAtLeast(96.dp) / 2
+            val wideLayout = maxWidth > maxHeight
+            ThemedContent {
+                Column(Modifier.fillMaxSize().padding(horizontal = XmproSpacing.pageHorizontal)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            "正在收听",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    IconButton(onClick = { queueOpen = true }) {
-                        Icon(Icons.Filled.PlaylistPlay, contentDescription = "播放列表")
-                    }
-                }
-
-                // long: 内容不足一屏时居中排布，超出时仅滚动内容；进度和主控始终留在底部。
-                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                    val contentHeight = maxHeight
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .heightIn(min = contentHeight),
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Spacer(Modifier.height(6.dp))
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            val cover = track?.coverUrl
-                            if (cover != null) {
-                                Box(
-                                    Modifier
-                                        .size(artworkSize)
-                                        .shadow(elevation = 18.dp, shape = RoundedCornerShape(28.dp), clip = false),
-                                ) {
-                                    Cover(cover, artworkSize.value.toInt())
-                                }
-                            } else {
-                                Box(
-                                    Modifier
-                                        .size(artworkSize)
-                                        .clip(RoundedCornerShape(28.dp))
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        Icons.Filled.PlayArrow,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.size(artworkSize * 0.3f),
-                                    )
-                                }
-                            }
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "收起")
                         }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                "正在收听",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(onClick = { queueOpen = true }) {
+                            Icon(Icons.Filled.PlaylistPlay, contentDescription = "播放列表")
+                        }
+                    }
 
-                        Text(
-                            track?.title ?: "尚未选择声音",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = XmproSpacing.sectionSpacing),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
-                        Text(
-                            listOfNotNull(track?.album?.takeIf { it.isNotEmpty() }, track?.artist?.takeIf { it.isNotEmpty() })
-                                .joinToString(" · "),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = XmproSpacing.compactSpacing)
-                                .then(
-                                    if (track?.albumKey?.isNotEmpty() == true) {
-                                        Modifier.clickable { onOpenAlbum(track.albumKey) }
-                                    } else {
-                                        Modifier
-                                    },
-                                ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
-
-                        // long: 功能入口与下方主控使用同一页面底色，放大缩放时避免大卡片相互挤压。
-                        Column(Modifier.fillMaxWidth().padding(top = XmproSpacing.sectionSpacing)) {
-                            Column(Modifier.padding(horizontal = XmproSpacing.componentSpacing)) {
-                                // long: 音质和音效与辅助操作集中展示，底部只保留五项主要播放控制。
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = XmproSpacing.minimumTouchTarget)
-                                        .clip(XmproShapes.compactCard)
-                                        .clickable { effectOpen = true }
-                                        .padding(horizontal = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    val quality = formatQuality(state.playingQuality).ifEmpty { state.playingQuality }
-                                    Text(
-                                        quality.ifEmpty { "音质" },
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    val preset = teikengstudio.xmpro.player.EffectPreset.of(state.effectPreset)
-                                    Text(
-                                        if (preset == teikengstudio.xmpro.player.EffectPreset.Off) "音效" else "音效 · ${preset.label}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-
-                                val savedState = state.downloads.firstOrNull { it.id == track?.id }
-                                Row(
-                                    Modifier.fillMaxWidth().padding(top = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    PlayerActionButton(
-                                        label = speedChipLabel(state.speed),
-                                        active = state.speed != 1f,
-                                        onClick = { speedOpen = true },
-                                    )
-                                    PlayerActionIcon(
-                                        icon = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                        label = if (isFavorite) "已收藏" else "收藏",
-                                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        enabled = track != null,
-                                        onClick = onFavorite,
-                                    )
-                                    PlayerActionIcon(
-                                        icon = when (savedState?.state) {
-                                            null -> Icons.Filled.FileDownload
-                                            teikengstudio.xmpro.download.DownloadState.DONE -> Icons.Filled.DownloadDone
-                                            teikengstudio.xmpro.download.DownloadState.FAILED -> Icons.Filled.Refresh
-                                            else -> Icons.Filled.FileDownload
-                                        },
-                                        label = when (savedState?.state) {
-                                            null -> "下载"
-                                            teikengstudio.xmpro.download.DownloadState.DONE -> "已下载"
-                                            teikengstudio.xmpro.download.DownloadState.FAILED -> "重试下载"
-                                            teikengstudio.xmpro.download.DownloadState.PAUSED -> "已暂停"
-                                            else -> "下载中"
-                                        },
-                                        tint = if (savedState == null) MaterialTheme.colorScheme.onSurfaceVariant
-                                        else MaterialTheme.colorScheme.primary,
-                                        // A finished file needs no second tap; the download page owns deletion.
-                                        enabled = track != null && savedState?.state != teikengstudio.xmpro.download.DownloadState.DONE,
-                                        onClick = { if (savedState == null) downloadOpen = true else onDownload(null) },
-                                    )
-                                    PlayerActionIcon(
-                                        icon = Icons.Filled.ChatBubbleOutline,
-                                        label = "评论",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        enabled = track != null,
-                                        onClick = onOpenComments,
-                                    )
-                                }
-                                Row(
-                                    Modifier.fillMaxWidth().padding(top = 2.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    PlayerActionIcon(
-                                        icon = Icons.Filled.BookmarkBorder,
-                                        label = "书签",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        enabled = track != null,
-                                        onClick = onBookmark,
-                                    )
-                                    PlayerActionIcon(
-                                        icon = Icons.Filled.Timer,
-                                        label = when {
-                                            state.sleepAtTrackEnd -> "播完停"
-                                            state.sleepAtMillis != null -> "已定时"
-                                            else -> "定时"
-                                        },
-                                        tint = if (state.sleepAtMillis != null || state.sleepAtTrackEnd) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        enabled = true,
-                                        onClick = { timerOpen = true },
-                                    )
-                                    // long: 开启头尾跳过时直接展示范围设置，避免用户不清楚实际跳过多少。
-                                    PlayerActionIcon(
-                                        icon = if (state.skipTrimEnabled) Icons.Filled.TaskAlt else Icons.Filled.SkipNext,
-                                        label = "跳过头尾",
-                                        tint = if (state.skipTrimEnabled) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        enabled = track != null,
-                                        onClick = {
-                                            val turningOn = !state.skipTrimEnabled
-                                            onSkipTrim(
-                                                turningOn,
-                                                state.introSkipPermille,
-                                                state.outroSkipPermille,
-                                                state.skipTrimMode,
-                                            )
-                                            if (turningOn) trimOpen = true
-                                        },
-                                    )
-                                }
-
-                                // long: 应用内音量与系统媒体音量分开，归入辅助区以保持主播放控件连贯。
-                                Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                    PlayerContentLayout(
+                        wideLayout = wideLayout,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        details = {
+                            PlayerTrackDetails(track, artworkMaxSize, onOpenAlbum)
+                        },
+                        actions = {
+                            // long: 功能、音量与主控使用同一页面底色，保留紧凑且连续的操作区域。
+                            Column(Modifier.fillMaxWidth().padding(top = XmproSpacing.sectionSpacing)) {
+                                Column(Modifier.padding(horizontal = XmproSpacing.componentSpacing)) {
+                                    // long: 音质和音效与辅助操作集中展示，底部只保留五项主要播放控制。
                                     Row(
-                                        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = XmproSpacing.minimumTouchTarget)
+                                            .clip(XmproShapes.compactCard)
+                                            .clickable { effectOpen = true }
+                                            .padding(horizontal = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        Icon(
-                                            when {
-                                                state.playVolume <= 0.01f -> Icons.Filled.VolumeMute
-                                                state.playVolume < 0.5f -> Icons.Filled.VolumeDown
-                                                else -> Icons.Filled.VolumeUp
+                                        val quality = formatQuality(state.playingQuality).ifEmpty { state.playingQuality }
+                                        Text(
+                                            quality.ifEmpty { "音质" },
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        val preset = teikengstudio.xmpro.player.EffectPreset.of(state.effectPreset)
+                                        Text(
+                                            if (preset == teikengstudio.xmpro.player.EffectPreset.Off) "音效" else "音效 · ${preset.label}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+
+                                    val savedState = state.downloads.firstOrNull { it.id == track?.id }
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceEvenly,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        PlayerActionButton(
+                                            label = speedChipLabel(state.speed),
+                                            active = state.speed != 1f,
+                                            onClick = { speedOpen = true },
+                                        )
+                                        PlayerActionIcon(
+                                            icon = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                            label = if (isFavorite) "已收藏" else "收藏",
+                                            tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            enabled = track != null,
+                                            onClick = onFavorite,
+                                        )
+                                        PlayerActionIcon(
+                                            icon = when (savedState?.state) {
+                                                null -> Icons.Filled.FileDownload
+                                                teikengstudio.xmpro.download.DownloadState.DONE -> Icons.Filled.DownloadDone
+                                                teikengstudio.xmpro.download.DownloadState.FAILED -> Icons.Filled.Refresh
+                                                else -> Icons.Filled.FileDownload
                                             },
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp),
+                                            label = when (savedState?.state) {
+                                                null -> "下载"
+                                                teikengstudio.xmpro.download.DownloadState.DONE -> "已下载"
+                                                teikengstudio.xmpro.download.DownloadState.FAILED -> "重试下载"
+                                                teikengstudio.xmpro.download.DownloadState.PAUSED -> "已暂停"
+                                                else -> "下载中"
+                                            },
+                                            tint = if (savedState == null) MaterialTheme.colorScheme.onSurfaceVariant
+                                            else MaterialTheme.colorScheme.primary,
+                                            // A finished file needs no second tap; the download page owns deletion.
+                                            enabled = track != null && savedState?.state != teikengstudio.xmpro.download.DownloadState.DONE,
+                                            onClick = { if (savedState == null) downloadOpen = true else onDownload(null) },
                                         )
-                                        PlayerSlider(
-                                            value = state.playVolume,
-                                            onValueChange = onVolume,
-                                            semanticsLabel = "应用内播放音量",
-                                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                                        PlayerActionIcon(
+                                            icon = Icons.Filled.ChatBubbleOutline,
+                                            label = "评论",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            enabled = track != null,
+                                            onClick = onOpenComments,
                                         )
-                                        Surface(
-                                            color = MaterialTheme.colorScheme.primaryContainer,
-                                            shape = CircleShape,
+                                    }
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(top = 2.dp),
+                                        horizontalArrangement = Arrangement.SpaceEvenly,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        PlayerActionIcon(
+                                            icon = Icons.Filled.BookmarkBorder,
+                                            label = "书签",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            enabled = track != null,
+                                            onClick = onBookmark,
+                                        )
+                                        PlayerActionIcon(
+                                            icon = Icons.Filled.Timer,
+                                            label = when {
+                                                state.sleepAtTrackEnd -> "播完停"
+                                                state.sleepAtMillis != null -> "已定时"
+                                                else -> "定时"
+                                            },
+                                            tint = if (state.sleepAtMillis != null || state.sleepAtTrackEnd) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            enabled = true,
+                                            onClick = { timerOpen = true },
+                                        )
+                                        // long: 开启头尾跳过时直接展示范围设置，避免用户不清楚实际跳过多少。
+                                        PlayerActionIcon(
+                                            icon = if (state.skipTrimEnabled) Icons.Filled.TaskAlt else Icons.Filled.SkipNext,
+                                            label = "跳过头尾",
+                                            tint = if (state.skipTrimEnabled) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            enabled = track != null,
+                                            onClick = {
+                                                val turningOn = !state.skipTrimEnabled
+                                                onSkipTrim(
+                                                    turningOn,
+                                                    state.introSkipPermille,
+                                                    state.outroSkipPermille,
+                                                    state.skipTrimMode,
+                                                )
+                                                if (turningOn) trimOpen = true
+                                            },
+                                        )
+                                    }
+
+                                    // long: 应用内音量与系统媒体音量分开，归入辅助区以保持主播放控件连贯。
+                                    Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
                                         ) {
+                                            Icon(
+                                                when {
+                                                    state.playVolume <= 0.01f -> Icons.Filled.VolumeMute
+                                                    state.playVolume < 0.5f -> Icons.Filled.VolumeDown
+                                                    else -> Icons.Filled.VolumeUp
+                                                },
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                            PlayerSlider(
+                                                value = state.playVolume,
+                                                onValueChange = onVolume,
+                                                semanticsLabel = "应用内播放音量",
+                                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                                            )
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.primaryContainer,
+                                                shape = CircleShape,
+                                            ) {
+                                                Text(
+                                                    "${(state.playVolume * 100).roundToInt()}%",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                    maxLines = 1,
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(Modifier.height(XmproSpacing.sectionSpacing))
+                                    Surface(
+                                        onClick = { queueOpen = true },
+                                        shape = CircleShape,
+                                        color = Color.Transparent,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Row(
+                                            Modifier.padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.componentSpacing),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.PlaylistPlay,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                            Spacer(Modifier.width(10.dp))
                                             Text(
-                                                "${(state.playVolume * 100).roundToInt()}%",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                maxLines = 1,
+                                                "待播列表",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                            Text(
+                                                "${state.queue.size} 集",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
                                     }
                                 }
-
-                                Spacer(Modifier.height(XmproSpacing.sectionSpacing))
-                                Surface(
-                                    onClick = { queueOpen = true },
-                                    shape = CircleShape,
-                                    color = Color.Transparent,
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Row(
-                                        Modifier.padding(horizontal = XmproSpacing.pageHorizontal, vertical = XmproSpacing.componentSpacing),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.PlaylistPlay,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(20.dp),
-                                        )
-                                        Spacer(Modifier.width(10.dp))
-                                        Text(
-                                            "待播列表",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                        Text(
-                                            "${state.queue.size} 集",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
                             }
-                        }
-                        Spacer(Modifier.height(12.dp))
-                    }
+                        },
+                        transport = {
+                            PlayerTransportControls(
+                                trackId = track?.id,
+                                durationMs = state.durationMs,
+                                positionMs = positionMs,
+                                isPlaying = state.isPlaying,
+                                onSeek = onSeek,
+                                onSkip = onSkip,
+                                onPrevious = onPrevious,
+                                onToggle = onToggle,
+                                onNext = onNext,
+                            )
+                        },
+                    )
                 }
-                PlayerTransportControls(
-                    trackId = track?.id,
-                    durationMs = state.durationMs,
-                    positionMs = positionMs,
-                    isPlaying = state.isPlaying,
-                    onSeek = onSeek,
-                    onSkip = onSkip,
-                    onPrevious = onPrevious,
-                    onToggle = onToggle,
-                    onNext = onNext,
-                )
             }
         }
     }
@@ -752,7 +696,111 @@ fun PlayerSheet(
     }
 }
 
-/** long: 进度更新只重组底部控制区；五个主控固定排列，所有尺寸由全局主题统一缩放。 */
+// long: 竖屏给封面弹性空间，功能与主控按实际高度排布；横屏分栏以保证所有入口一屏可达。
+@Composable
+private fun PlayerContentLayout(
+    wideLayout: Boolean,
+    modifier: Modifier = Modifier,
+    details: @Composable () -> Unit,
+    actions: @Composable () -> Unit,
+    transport: @Composable () -> Unit,
+) {
+    if (wideLayout) {
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                Box(Modifier.weight(1f).fillMaxWidth()) { details() }
+                transport()
+            }
+            Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                actions()
+            }
+        }
+    } else {
+        Column(modifier) {
+            Box(Modifier.weight(1f).fillMaxWidth()) { details() }
+            actions()
+            transport()
+        }
+    }
+}
+
+@Composable
+private fun PlayerTrackDetails(
+    track: Track?,
+    artworkMaxSize: Dp,
+    onOpenAlbum: (String) -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // long: 为两行标题和专辑说明先预留高度，短屏时只收缩封面，避免功能区被顶出屏幕。
+        val typography = MaterialTheme.typography
+        val textHeight = with(LocalDensity.current) {
+            typography.titleMedium.lineHeight.toDp() * 2 + typography.bodySmall.lineHeight.toDp()
+        } + XmproSpacing.sectionSpacing + XmproSpacing.compactSpacing + 8.dp
+        val artworkSize = minOf(artworkMaxSize, (maxHeight - textHeight).coerceAtLeast(0.dp))
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                val cover = track?.coverUrl
+                if (cover != null) {
+                    Box(
+                        Modifier
+                            .size(artworkSize)
+                            .shadow(elevation = 18.dp, shape = RoundedCornerShape(28.dp), clip = false),
+                    ) {
+                        Cover(cover, artworkSize.value.toInt())
+                    }
+                } else {
+                    Box(
+                        Modifier
+                            .size(artworkSize)
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(artworkSize * 0.3f),
+                        )
+                    }
+                }
+            }
+
+            Text(
+                track?.title ?: "尚未选择声音",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = XmproSpacing.sectionSpacing),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                listOfNotNull(track?.album?.takeIf { it.isNotEmpty() }, track?.artist?.takeIf { it.isNotEmpty() })
+                    .joinToString(" · "),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = XmproSpacing.compactSpacing)
+                    .then(
+                        if (track?.albumKey?.isNotEmpty() == true) {
+                            Modifier.clickable { onOpenAlbum(track.albumKey) }
+                        } else {
+                            Modifier
+                        },
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/** long: 进度更新只重组主控区域，五项主控固定可见并保留标准触控范围。 */
 @Composable
 private fun PlayerTransportControls(
     trackId: String?,
