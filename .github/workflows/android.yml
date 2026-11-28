@@ -11,6 +11,10 @@ on:
         required: true
         type: boolean
         default: false
+      release_notes:
+        description: 本次更新说明（留空则从 CHANGELOG 提取）
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -133,10 +137,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
           set -euo pipefail
           (cd release && sha256sum --check SHA256SUMS)
-          python3 tool/release_notes.py "$RELEASE_TAG" --output release/RELEASE-NOTES.md
+          # long: 允许手动发版时直接提供更新说明，避免仅因缺少日志条目而中断已验证 APK 的发布。
+          if [[ -n "$RELEASE_NOTES" ]]; then
+            printf '%s\n' "$RELEASE_NOTES" > release/RELEASE-NOTES.md
+          else
+            python3 tool/release_notes.py "$RELEASE_TAG" --output release/RELEASE-NOTES.md
+          fi
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" release/*.apk release/SHA256SUMS --clobber
             gh release edit "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file release/RELEASE-NOTES.md

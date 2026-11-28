@@ -144,67 +144,74 @@ private fun ReleaseNotesBody(notes: ReleaseNotes) {
     }
 }
 
-/**
- * Start-up update offer: download in place, then hand over to the installer.
- *
- * The same download path as the about page is used, so the SHA-256 check and the
- * progress reporting stay in one place.
- */
+/** long: 自动与手动检查共用一个全局窗口，检测结果、下载和安装反馈不会再叠出第二层弹框。 */
 @Composable
 fun UpdatePromptDialog(
-    tag: String,
-    progress: Int,
-    ready: Boolean,
-    notes: String?,
+    state: UiState,
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val downloading = progress in 0..99 && !ready
-    val parsed = remember(notes) { ReleaseNotes.parse(notes) }
+    val downloading = state.updateDownloading
+    val hasRelease = state.updateUrl != null
+    val parsed = remember(state.updateNotes) { ReleaseNotes.parse(state.updateNotes) }
     AlertDialog(
         onDismissRequest = { if (!downloading) onDismiss() },
         icon = { Icon(Icons.Filled.SystemUpdate, contentDescription = null) },
-        title = { Text("发现新版本 $tag") },
+        title = {
+            Text(
+                when {
+                    state.updateReady -> "可以安装"
+                    downloading -> "正在下载"
+                    hasRelease -> "发现新版本 ${state.updatePromptTag.orEmpty()}"
+                    else -> "检查结果"
+                },
+            )
+        },
         text = {
-            Column {
+            Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
                 Text(
-                    when {
-                        ready -> "安装包已下载并通过校验。"
+                    state.updateResult ?: when {
                         downloading -> "正在下载安装包…"
                         parsed.isEmpty -> "可以下载并安装这个版本。"
-                        // The notes speak for themselves once downloading starts.
                         else -> "本次更新的内容："
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                if (!downloading && !parsed.isEmpty) {
+                if (!downloading && !state.updateReady && !parsed.isEmpty) {
                     ReleaseNotesBody(parsed)
                 }
                 if (downloading) {
-                    LinearProgressIndicator(
-                        progress = { (progress.coerceAtLeast(0) / 100f) },
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    )
-                    Text(
-                        if (progress < 0) "下载中…" else "$progress%",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
+                    // long: 镜像未提供文件长度时仍处于下载中，使用不定进度，不能恢复“立即更新”按钮。
+                    if (state.updateProgress >= 0) {
+                        LinearProgressIndicator(
+                            progress = { state.updateProgress.coerceIn(0, 100) / 100f },
+                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        )
+                        Text(
+                            "${state.updateProgress}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    } else {
+                        LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 12.dp))
+                    }
                 }
             }
         },
         confirmButton = {
             when {
-                ready -> TextButton(onClick = onInstall) { Text("安装") }
+                state.updateReady -> TextButton(onClick = onInstall) { Text("安装") }
                 downloading -> TextButton(onClick = {}, enabled = false) { Text("下载中") }
-                else -> TextButton(onClick = onDownload) { Text("立即更新") }
+                hasRelease -> TextButton(onClick = onDownload) {
+                    Text(if (state.updateResult == null) "立即更新" else "重试下载")
+                }
             }
         },
         dismissButton = {
-            if (!ready) {
-                TextButton(onClick = onDismiss, enabled = !downloading) { Text("稍后") }
+            TextButton(onClick = onDismiss, enabled = !downloading) {
+                Text(if (hasRelease) "稍后" else "关闭")
             }
         },
     )
@@ -239,12 +246,9 @@ fun SettingsScreen(
     onEffectStrength: (Int) -> Unit = {},
     onSkipTrim: (Boolean, Int, Int, String) -> Unit,
     onCheckUpdate: () -> Unit = {},
-    onDownloadUpdate: () -> Unit = {},
-    onInstallUpdate: () -> Unit = {},
     onMirror: (String) -> Unit = {},
     onAutoCheckUpdate: (Boolean) -> Unit = {},
     onOpenLink: (String) -> Unit = {},
-    onDismissUpdate: () -> Unit = {},
     onDynamicColor: (Boolean) -> Unit,
     onSeedColor: (Int) -> Unit,
     onOpenSocial: (String) -> Unit,
@@ -529,12 +533,9 @@ fun SettingsScreen(
                     state = state,
                     bottomInset = bottomInset,
                     onCheckUpdate = onCheckUpdate,
-                    onDownloadUpdate = onDownloadUpdate,
-                    onInstallUpdate = onInstallUpdate,
                     onMirror = onMirror,
                     onAutoCheckUpdate = onAutoCheckUpdate,
                     onOpenLink = onOpenLink,
-                    onDismissResult = onDismissUpdate,
                 )
             }
         }
@@ -2092,12 +2093,9 @@ private fun AboutPage(
     state: UiState,
     bottomInset: Dp,
     onCheckUpdate: () -> Unit,
-    onDownloadUpdate: () -> Unit,
-    onInstallUpdate: () -> Unit,
     onMirror: (String) -> Unit,
     onAutoCheckUpdate: (Boolean) -> Unit,
     onOpenLink: (String) -> Unit,
-    onDismissResult: () -> Unit,
 ) {
     val context = LocalContext.current
     val version = remember {
@@ -2225,70 +2223,6 @@ private fun AboutPage(
             },
             confirmButton = {
                 TextButton(onClick = { mirrorOpen = false }) { Text("关闭") }
-            },
-        )
-    }
-
-    state.updateResult?.let { message ->
-        val downloading = state.updateProgress >= 0 && !state.updateReady
-        AlertDialog(
-            onDismissRequest = { if (!downloading) onDismissResult() },
-            title = {
-                Text(
-                    when {
-                        state.updateReady -> "可以安装"
-                        downloading -> "正在下载"
-                        state.updateUrl != null -> "发现更新"
-                        else -> "检查结果"
-                    },
-                )
-            },
-            text = {
-                Column(
-                    Modifier
-                        .heightIn(max = 380.dp)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    if (downloading) {
-                        if (state.updateProgress > 0) {
-                            LinearProgressIndicator(
-                                progress = { state.updateProgress / 100f },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Text(
-                                "${state.updateProgress}%",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 6.dp),
-                            )
-                        } else {
-                            LinearProgressIndicator(Modifier.fillMaxWidth())
-                        }
-                    }
-                    Text(
-                        message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = if (downloading) 12.dp else 0.dp),
-                    )
-                }
-            },
-            confirmButton = {
-                when {
-                    state.updateReady ->
-                        TextButton(onClick = onInstallUpdate) { Text("安装") }
-
-                    downloading -> Unit
-
-                    state.updateUrl != null ->
-                        TextButton(onClick = onDownloadUpdate) { Text("立即更新") }
-
-                    else -> Unit
-                }
-            },
-            dismissButton = {
-                if (!downloading) {
-                    TextButton(onClick = onDismissResult) { Text("关闭") }
-                }
             },
         )
     }

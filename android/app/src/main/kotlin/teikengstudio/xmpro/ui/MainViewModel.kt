@@ -128,16 +128,18 @@ data class UiState(
     val effectStrength: Int = 50,
     /** Bitrate the current stream actually resolved to, e.g. m4a_128. */
     val playingQuality: String = "",
-    /** About page: mirror choice and the update probe result. */
+    /** Mirror choice and messages displayed by the global update dialog. */
     val updateMirror: String = "",
     val updateChecking: Boolean = false,
     val updateResult: String? = null,
     val updateUrl: String? = null,
     /** In-app download progress 0..100, or -1 while a mirror hides the length. */
     val updateProgress: Int = -1,
+    /** long: 下载状态独立于百分比，镜像不提供文件大小时也不能重复下载或重新检查。 */
+    val updateDownloading: Boolean = false,
     /** True once the APK is downloaded and waiting for the installer. */
     val updateReady: Boolean = false,
-    /** A newer release was found on start-up; the shell offers it as a dialog. */
+    /** long: 全局唯一更新弹框的开关，自动发现新版及手动检查结果都由 Shell 显示。 */
     val updatePrompt: Boolean = false,
     /** Version label shown in that dialog. */
     val updatePromptTag: String? = null,
@@ -286,6 +288,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
      */
     /** Set for the whole request so two entry points cannot check at once. */
     private var updateCheckInFlight = false
+    private var updateCheckRequestedManually = false
 
     /**
      * Tag the user waved away in this process.
@@ -1650,10 +1653,9 @@ class MainViewModel(private val context: Context, private val container: AppCont
 
     fun setUpdateMirror(mirror: String) {
         runCatching { container.setUpdateMirror(mirror) }
-        _state.update { it.copy(updateMirror = mirror, updateResult = null, updateUrl = null) }
+        _state.update { it.copy(updateMirror = mirror) }
     }
 
-    /** Probes the project's GitHub releases for a newer build. */
     /**
      * Looks for a newer release.
      *
@@ -1661,9 +1663,25 @@ class MainViewModel(private val context: Context, private val container: AppCont
      * failure stays invisible instead of reporting a network problem.
      */
     fun checkUpdate(silent: Boolean = false) {
-        if (updateCheckInFlight) return
+        // long: 从安装权限页回到前台会再次触发自动检查，不能清空已下载文件或覆盖正在显示的反馈。
+        val currentState = _state.value
+        if (currentState.updateDownloading || currentState.updateReady || (silent && currentState.updatePrompt)) {
+            if (!silent) _state.update { it.copy(updatePrompt = true) }
+            return
+        }
+        if (updateCheckInFlight) {
+            // long: 自动检查尚未返回时手动点击也要给出结果，但仍复用同一网络请求。
+            if (!silent) {
+                updateCheckRequestedManually = true
+                _state.update { it.copy(updateChecking = true) }
+            }
+            return
+        }
         updateCheckInFlight = true
-        if (!silent) _state.update { it.copy(updateChecking = true, updateResult = null, updateUrl = null) }
+        updateCheckRequestedManually = !silent
+        if (!silent) _state.update {
+            it.copy(updateChecking = true, updatePrompt = false, updateResult = null)
+        }
         val mirror = _state.value.updateMirror
         val current = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0"
@@ -1676,45 +1694,33 @@ class MainViewModel(private val context: Context, private val container: AppCont
             // A network failure must not burn the window, otherwise one bad
             // launch hides every later release for half a day.
             if (outcome.isSuccess) container.setUpdateCheckedAt(System.currentTimeMillis())
+            val manual = updateCheckRequestedManually
+            // long: 先保存待下载版本，再显示唯一弹框，避免立即点击更新时尚无目标版本。
+            pendingRelease = release
+            pendingFile = null
             _state.update {
                 it.copy(
                     updateChecking = false,
                     updateResult = when {
-                        release != null -> {
-                            val suffix = if (release.notes.isBlank()) "" else "\n\n" + release.notes
-                            "发现新版本 ${release.tag}" + suffix
-                        }
-
+                        release != null || !manual -> null
                         outcome.isSuccess -> "已是最新版本"
-                        // A silent check never reports its own failure.
-                        silent -> it.updateResult
                         else -> outcome.exceptionOrNull()?.message ?: "检查失败"
                     },
                     updateUrl = release?.apkUrl ?: release?.pageUrl,
                     updateProgress = -1,
                     updateReady = false,
-                    updatePrompt = release != null && release.tag != suppressedUpdateTag,
+                    updatePrompt = manual || (release != null && release.tag != suppressedUpdateTag),
                     updatePromptTag = release?.tag,
                     updateNotes = release?.notes?.takeIf { it.isNotBlank() },
                 )
             }
-            pendingRelease = release
-            pendingFile = null
             updateCheckInFlight = false
         }
-    }
-
-    fun clearUpdateResult() = _state.update {
-        it.copy(updateResult = null, updateUrl = null, updateProgress = -1, updateReady = false)
     }
 
     private var pendingRelease: teikengstudio.xmpro.updater.Updater.Release? = null
     private var pendingFile: java.io.File? = null
 
-    /**
-     * Downloads the new APK in-app and verifies its SHA-256 against the release's
-     * SHA256SUMS before the installer ever sees it.
-     */
     /**
      * Turns the start-up probe on or off.
      *
@@ -1737,8 +1743,10 @@ class MainViewModel(private val context: Context, private val container: AppCont
     }
 
     fun dismissUpdatePrompt() {
-        suppressedUpdateTag = _state.value.updatePromptTag
-        _state.update { it.copy(updatePrompt = false, updatePromptTag = null) }
+        if (_state.value.updateDownloading) return
+        _state.value.updatePromptTag?.let { suppressedUpdateTag = it }
+        // long: 关闭窗口只清理显示状态，保留已下载文件，用户再次检查时可以继续安装。
+        _state.update { it.copy(updatePrompt = false) }
     }
 
     /**
@@ -1755,19 +1763,28 @@ class MainViewModel(private val context: Context, private val container: AppCont
 
     fun downloadUpdate() {
         val release = pendingRelease ?: return
-        if (_state.value.updateProgress >= 0) return
-        _state.update { it.copy(updateProgress = 0, updateReady = false) }
+        if (_state.value.updateDownloading || _state.value.updateReady) return
+        _state.update {
+            it.copy(updatePrompt = true, updateDownloading = true, updateProgress = 0, updateResult = null)
+        }
         viewModelScope.launch {
-            val outcome = withContext(Dispatchers.IO) {
-                teikengstudio.xmpro.updater.Updater.download(
-                    context = context,
-                    release = release,
-                    mirror = container.updateMirror(),
-                ) { percent ->
-                    _state.update { state ->
-                        if (state.updateProgress == percent) state else state.copy(updateProgress = percent)
+            val outcome = try {
+                withContext(Dispatchers.IO) {
+                    teikengstudio.xmpro.updater.Updater.download(
+                        context = context,
+                        release = release,
+                        mirror = container.updateMirror(),
+                    ) { percent ->
+                        _state.update { state ->
+                            if (state.updateProgress == percent) state else state.copy(updateProgress = percent)
+                        }
                     }
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                // long: 文件目录创建等下载前置失败也在同一窗口提示，恢复重试入口而不是一直显示下载中。
+                teikengstudio.xmpro.updater.Updater.Download.Failed(error.message ?: "下载失败，请重试")
             }
             when (outcome) {
                 is teikengstudio.xmpro.updater.Updater.Download.Done -> {
@@ -1775,6 +1792,7 @@ class MainViewModel(private val context: Context, private val container: AppCont
                     _state.update {
                         it.copy(
                             updateReady = true,
+                            updateDownloading = false,
                             updateProgress = 100,
                             updateResult = if (outcome.verified) {
                                 "已下载并通过 SHA-256 校验，点「安装」继续。"
@@ -1786,7 +1804,9 @@ class MainViewModel(private val context: Context, private val container: AppCont
                 }
 
                 is teikengstudio.xmpro.updater.Updater.Download.Failed -> {
-                    _state.update { it.copy(updateProgress = -1, updateResult = outcome.message) }
+                    _state.update {
+                        it.copy(updateDownloading = false, updateProgress = -1, updateResult = outcome.message)
+                    }
                 }
             }
         }

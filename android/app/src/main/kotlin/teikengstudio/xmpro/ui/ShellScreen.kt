@@ -270,12 +270,9 @@ fun ShellScreen(
                         onEffectStrength = viewModel::setEffectStrength,
                         onSkipTrim = viewModel::setSkipTrim,
                         onCheckUpdate = viewModel::checkUpdate,
-                        onDownloadUpdate = viewModel::downloadUpdate,
-                        onInstallUpdate = viewModel::installUpdate,
                         onMirror = viewModel::setUpdateMirror,
                         onAutoCheckUpdate = viewModel::setAutoCheckUpdate,
                         onOpenLink = viewModel::openLink,
-                        onDismissUpdate = viewModel::clearUpdateResult,
                         onDynamicColor = viewModel::setDynamicColor,
                         onSeedColor = viewModel::setSeedColor,
                         onOpenSocial = viewModel::openSocial,
@@ -357,10 +354,7 @@ fun ShellScreen(
 
         if (state.updatePrompt) {
             UpdatePromptDialog(
-                tag = state.updatePromptTag ?: "新版本",
-                progress = state.updateProgress,
-                ready = state.updateReady,
-                notes = state.updateNotes,
+                state = state,
                 onDownload = viewModel::downloadUpdate,
                 onInstall = viewModel::installUpdate,
                 onDismiss = viewModel::dismissUpdatePrompt,
